@@ -39,6 +39,33 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* ── Deep Sea Professional Design System ── */
+  --ds-primary:                   #005C72;
+  --ds-primary-container:         #005C72;
+  --ds-on-primary:                #ffffff;
+  --ds-on-primary-container:      #8fd2ec;
+  --ds-secondary:                 #4a626b;
+  --ds-secondary-container:       #cde7f2;
+  --ds-on-secondary-container:    #506872;
+  --ds-surface:                   #f8fafb;
+  --ds-surface-bright:            #f8fafb;
+  --ds-surface-container-lowest:  #ffffff;
+  --ds-surface-container-low:     #f2f4f5;
+  --ds-surface-container:         #eceeef;
+  --ds-surface-container-high:    #e6e8e9;
+  --ds-surface-variant:           #e1e3e4;
+  --ds-background:                #f8fafb;
+  --ds-on-background:             #191c1d;
+  --ds-on-surface:                #191c1d;
+  --ds-on-surface-variant:        #3f484c;
+  --ds-outline:                   #70787d;
+  --ds-outline-variant:           #c0c8cc;
+  --ds-error:                     #ba1a1a;
+  --ds-error-container:           #ffdad6;
+  --ds-on-error-container:        #93000a;
+  --ds-tertiary:                  #5d3300;
+  --ds-on-tertiary-container:     #febb7d;
 }
 
 .dark {
@@ -117,6 +144,38 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ── Deep Sea Professional tokens exposed as Tailwind utilities ── */
+  --color-ds-primary:                  var(--ds-primary);
+  --color-ds-primary-container:        var(--ds-primary-container);
+  --color-ds-on-primary:               var(--ds-on-primary);
+  --color-ds-on-primary-container:     var(--ds-on-primary-container);
+  --color-ds-secondary:                var(--ds-secondary);
+  --color-ds-secondary-container:      var(--ds-secondary-container);
+  --color-ds-on-secondary-container:   var(--ds-on-secondary-container);
+  --color-ds-surface:                  var(--ds-surface);
+  --color-ds-surface-bright:           var(--ds-surface-bright);
+  --color-ds-surface-container-lowest: var(--ds-surface-container-lowest);
+  --color-ds-surface-container-low:    var(--ds-surface-container-low);
+  --color-ds-surface-container:        var(--ds-surface-container);
+  --color-ds-surface-container-high:   var(--ds-surface-container-high);
+  --color-ds-surface-variant:          var(--ds-surface-variant);
+  --color-ds-background:               var(--ds-background);
+  --color-ds-on-background:            var(--ds-on-background);
+  --color-ds-on-surface:               var(--ds-on-surface);
+  --color-ds-on-surface-variant:       var(--ds-on-surface-variant);
+  --color-ds-outline:                  var(--ds-outline);
+  --color-ds-outline-variant:          var(--ds-outline-variant);
+  --color-ds-error:                    var(--ds-error);
+  --color-ds-error-container:          var(--ds-error-container);
+  --color-ds-on-error-container:       var(--ds-on-error-container);
+  --color-ds-tertiary:                 var(--ds-tertiary);
+  --color-ds-on-tertiary-container:    var(--ds-on-tertiary-container);
+
+  /* ── Fonts ── */
+  --font-headline: 'Manrope', sans-serif;
+  --font-body:     'Inter', sans-serif;
+  --font-label:    'Inter', sans-serif;
 }
 
 @layer base {

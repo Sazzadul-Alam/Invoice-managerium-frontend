@@ -127,4 +127,7 @@ export const authApi = {
       "/login",
       payload
     ),
+
+  verifyEmail: (token: string) =>
+    post<{ success: boolean; message: string }>(`/verify/${token}`, {}),
 };

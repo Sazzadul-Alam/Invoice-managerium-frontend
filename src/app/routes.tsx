@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { VerifyEmail } from "./pages/VerifyEmail";
+import { VerifyEmailToken } from "./pages/VerifyEmailToken";
 import { Dashboard } from "./pages/Dashboard";
 
 export const router = createBrowserRouter([
@@ -22,7 +23,12 @@ export const router = createBrowserRouter([
     Component: VerifyEmail,
   },
   {
+    // This matches the URL sent in the verification email
+    path: "/user/verify/:token",
+    Component: VerifyEmailToken,
+  },
+  {
     path: "/dashboard",
     Component: Dashboard,
   },
-]);
+]);
