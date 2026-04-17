@@ -269,6 +269,87 @@ async function authedPost<T>(basePath: string, path: string, body: unknown): Pro
   return data as T;
 }
 
+export async function authedFormDataPost<T>(basePath: string, path: string, formData: FormData): Promise<T> {
+  const token = getToken();
+  const res = await fetch(`${basePath}${path}`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+    body: formData,
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    if (Array.isArray(data.errors)) {
+      throw new Error(data.errors.map((e: any) => e.message).join(", "));
+    }
+    throw new Error(data.message ?? "Something went wrong");
+  }
+  return data as T;
+}
+
+export async function authedFormDataPut<T>(basePath: string, path: string, formData: FormData): Promise<T> {
+  const token = getToken();
+  const res = await fetch(`${basePath}${path}`, {
+    method: "PUT",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+    body: formData,
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    if (Array.isArray(data.errors)) {
+      throw new Error(data.errors.map((e: any) => e.message).join(", "));
+    }
+    throw new Error(data.message ?? "Something went wrong");
+  }
+  return data as T;
+}
+
+// ─── Shared Types ─────────────────────────────────────────────────────────────
+
+export interface ApiCategory {
+  _id: string;
+  name: string;
+  slug: string;
+  image?: string;
+  status: string;
+}
+
+export interface ApiBrand {
+  _id: string;
+  name: string;
+  slug: string;
+  logo?: string;
+  status: string;
+}
+
+export interface ApiProduct {
+  _id: string;
+  name: string;
+  slug: string;
+  varientId: { _id: string; name: string; value: string } | string;
+  brandId?: ApiBrand | string;
+  description: string;
+  price: number;
+  previousPrice?: number;
+  extraPrice?: number;
+  buyingPrice?: number;
+  stock: number;
+  sold: number;
+  rating: number;
+  location: string;
+  featured: boolean;
+  status: "active" | "inactive";
+  images?: { image: string; _id?: string }[];
+  varient?: { _id: string; name: string; value: string }[];
+}
+
 export const authApi = {
   register: (payload: RegisterPayload) =>
     post<{ success: boolean; message: string; access_token: string; user: ApiUser }>("/register", payload),
@@ -485,4 +566,76 @@ export const adminApi = {
       return data as { success: boolean; message: string };
     });
   },
+};
+
+// ─── Category API ──────────────────────────────────────────────────────────
+
+const CATEGORY_BASE = `${API_BASE}/category`;
+
+export const categoryApi = {
+  getAll: () =>
+    authedGet<{ success: boolean; categories: ApiCategory[] }>(`${CATEGORY_BASE}/all`),
+};
+
+// ─── Varient Attribute API ──────────────────────────────────────────────────────────
+
+const VARIENT_ATTR_BASE = `${API_BASE}/varient-attribute`;
+
+export const varientAttributeApi = {
+  getAll: () =>
+    authedGet<{ success: boolean; attributes: { _id: string; name: string; value: string }[] }>(`${VARIENT_ATTR_BASE}/all`),
+};
+
+// ─── Brand API ──────────────────────────────────────────────────────────
+
+const BRAND_BASE = `${API_BASE}/brand`;
+
+export const brandApi = {
+  getAll: () =>
+    authedGet<{ success: boolean; brands: ApiBrand[] }>(`${BRAND_BASE}/all`),
+};
+
+// ─── Product API ──────────────────────────────────────────────────────────
+
+const PRODUCT_BASE = `${API_BASE}/product`;
+
+export const productApi = {
+  getAll: () =>
+    authedGet<{ success: boolean; products: ApiProduct[]; total: number }>(`${PRODUCT_BASE}/all`),
+  
+  create: (formData: FormData) =>
+    authedFormDataPost<{ success: boolean; message: string; data: ApiProduct }>(
+      PRODUCT_BASE,
+      "/create",
+      formData
+    ),
+
+  update: (id: string, formData: FormData) =>
+    authedFormDataPut<{ success: boolean; message: string; data: ApiProduct }>(
+      PRODUCT_BASE,
+      `/${id}`,
+      formData
+    ),
+
+  delete: (id: string) => {
+    const token = getToken();
+    return fetch(`${PRODUCT_BASE}/${id}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: "include",
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Failed to delete product");
+      return data as { success: boolean; message: string };
+    });
+  },
+
+  toggleStatus: (id: string, status: "active" | "inactive") =>
+    authedPut<{ success: boolean; message: string; data: ApiProduct }>(
+      `/product/active-inactive/${id}`,
+      { status }
+    ),
 };

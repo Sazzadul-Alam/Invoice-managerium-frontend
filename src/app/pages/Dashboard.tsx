@@ -9,6 +9,7 @@ import {
   shopApi,
   subscriptionApi,
 } from "../auth.utils";
+import { ProductManagement } from "./ProductManagement";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Demo data (Products only — real product API is Phase 3)                  */
@@ -302,7 +303,7 @@ export function Dashboard() {
             onRefresh={fetchData}
           />
         )}
-        {activeTab === "products" && <TabProducts mySub={mySub} />}
+        {activeTab === "products" && <ProductManagement mySub={mySub} />}
         {activeTab === "invoice" && <TabDemoInvoice shop={shop} />}
         {activeTab === "profile" && (
           <TabProfile
