@@ -5,6 +5,7 @@ import {
   getToken,
   getRole,
   clearSession,
+  type SubStats,
   type PopulatedSubscription,
   type ApiPlan,
 } from "../auth.utils";
