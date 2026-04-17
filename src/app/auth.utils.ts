@@ -318,6 +318,19 @@ export const authApi = {
       "/update-password",
       payload
     ),
+
+  forgotPassword: (email: string) =>
+    post<{ success: boolean; message: string }>("/forget-password", { email }),
+
+  verifyOtp: (otp: string) =>
+    post<{ success: boolean; message: string }>("/verify-otp", { otp }),
+
+  resetPassword: (payload: {
+    otp: string;
+    newPassword: string;
+    confirmPassword: string;
+  }) =>
+    post<{ success: boolean; message: string }>("/reset-password", payload),
 };
 
 // ─── Shop API ─────────────────────────────────────────────────────────────────

@@ -481,17 +481,30 @@ export function AdminDashboard() {
             <Icon name="shield_person" style={{ fontSize: 20, color: "var(--ds-on-primary)" }} />
           </div>
           <span style={{ fontWeight: 700, fontSize: 16, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)" }}>
-            Kanto Admin
+            Admin
           </span>
         </div>
-        {stats && stats.pending > 0 && (
-          <span style={{
-            padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-            background: "#e8a73520", color: "#e8a735",
-          }}>
-            {stats.pending} pending
-          </span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {stats && stats.pending > 0 && (
+            <span style={{
+              padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+              background: "#e8a73520", color: "#e8a735",
+            }}>
+              {stats.pending} pending
+            </span>
+          )}
+          <button
+            onClick={logout}
+            style={{
+              background: "transparent", border: "none", padding: 8, borderRadius: "50%",
+              color: "var(--ds-on-surface-variant)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+            title="Logout"
+          >
+            <Icon name="logout" style={{ fontSize: 20 }} />
+          </button>
+        </div>
       </header>
 
       {/* content */}

@@ -299,6 +299,7 @@ export function Dashboard() {
             plans={plans}
             mySub={mySub}
             currentPlanSlug={currentPlanSlug}
+            onRefresh={fetchData}
           />
         )}
         {activeTab === "products" && <TabProducts mySub={mySub} />}
@@ -379,14 +380,50 @@ function TabBuyPlan({
   plans,
   mySub,
   currentPlanSlug,
+  onRefresh,
 }: {
   user: ApiUser | null;
   plans: ApiPlan[];
   mySub: ApiUserSubscription | null;
   currentPlanSlug: string;
+  onRefresh: () => void;
 }) {
   const userName = user?.name ?? sessionStorage.getItem("userName") ?? "Shop Owner";
   const subStatus = mySub?.status;
+
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [transactionId, setTransactionId] = useState("");
+  const [loadingPurchase, setLoadingPurchase] = useState(false);
+  const [toast, setToast] = useState("");
+
+  const handlePurchase = async (plan: ApiPlan) => {
+    if (!mobileNumber || !transactionId) {
+      setToast("Mobile number and Transaction ID are required.");
+      setTimeout(() => setToast(""), 3000);
+      return;
+    }
+    setLoadingPurchase(true);
+    try {
+      await subscriptionApi.purchase({
+        planId: plan._id,
+        paymentMethod: "bKash",
+        paymentReference: `${mobileNumber} - ${transactionId}`,
+        paymentAmount: plan.price,
+      });
+      setToast("Upgrade requested successfully. Waiting for admin approval.");
+      setTimeout(() => setToast(""), 3000);
+      setSelectedPlanId(null);
+      setMobileNumber("");
+      setTransactionId("");
+      onRefresh();
+    } catch (err: any) {
+      setToast(err.message || "Failed to purchase plan.");
+      setTimeout(() => setToast(""), 3000);
+    } finally {
+      setLoadingPurchase(false);
+    }
+  };
 
   return (
     <div className="px-4 pt-5 pb-4 space-y-4">
@@ -505,14 +542,73 @@ function TabBuyPlan({
               ))}
             </ul>
 
-            {!isCurrent && (
+            {!isCurrent && selectedPlanId !== plan._id && (
               <button
+                onClick={() => plan.slug !== "enterprise" && setSelectedPlanId(plan._id)}
                 className="w-full py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] text-white"
                 style={{ background: color }}
               >
                 {plan.slug === "enterprise" ? "Contact Us" : "Upgrade"} →
               </button>
             )}
+
+            {!isCurrent && selectedPlanId === plan._id && (
+              <div className="mt-4 p-4 rounded-xl border" style={{ borderColor: color, background: "var(--ds-surface-container-lowest)" }}>
+                <p className="text-xs text-ds-on-surface-variant mb-3 font-semibold leading-relaxed">
+                  {plan.description}
+                </p>
+                <div className="p-3 mb-4 rounded-lg text-xs" style={{ background: "rgba(232,167,53,0.1)", border: "1px solid rgba(232,167,53,0.3)" }}>
+                  <p className="font-semibold text-ds-on-surface mb-1">To continue, please send money to:</p>
+                  <p className="text-ds-on-surface-variant font-medium">• bKash: 01732570221</p>
+                  <p className="text-ds-on-surface-variant font-medium">• Bank Account: 1444444444</p>
+                  <p className="text-ds-on-surface-variant font-medium mt-1">and provide the transaction details below.</p>
+                </div>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-1">Mobile Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 017..."
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                      style={{ borderColor: "var(--ds-outline-variant)", background: "var(--ds-surface-container-highest)" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-1">Transaction ID</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. TRXR123456"
+                      value={transactionId}
+                      onChange={(e) => setTransactionId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                      style={{ borderColor: "var(--ds-outline-variant)", background: "var(--ds-surface-container-highest)" }}
+                    />
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => setSelectedPlanId(null)}
+                      className="flex-1 py-2 rounded-lg text-xs font-bold transition-all border"
+                      style={{ borderColor: "var(--ds-outline)", color: "var(--ds-outline)" }}
+                      disabled={loadingPurchase}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handlePurchase(plan)}
+                      className="flex-[2] py-2 rounded-lg text-xs font-bold transition-all text-white flex items-center justify-center gap-2"
+                      style={{ background: color, opacity: loadingPurchase ? 0.7 : 1 }}
+                      disabled={loadingPurchase}
+                    >
+                      {loadingPurchase ? "Submitting..." : "Submit Payment"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {isCurrent && (
               <div
                 className="text-center text-xs font-semibold py-2 rounded-xl"
@@ -527,6 +623,15 @@ function TabBuyPlan({
           </div>
         );
       })}
+
+      {toast && (
+        <div
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-semibold shadow-lg z-50 transition-all"
+          style={{ background: "var(--ds-on-surface)", color: "var(--ds-surface-container-lowest)" }}
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
@@ -1368,6 +1473,33 @@ function ChangePasswordModal({
   const [showOld, setShowOld] = useState(false);
   const [showNew, setShowNew] = useState(false);
 
+  // Password strength
+  const passwordStrength = (() => {
+    const p = newPass;
+    if (!p) return 0;
+    let s = 0;
+    if (p.length >= 8) s++;
+    if (p.length >= 10) s++;
+    if (/[A-Z]/.test(p)) s++;
+    if (/[0-9!@#$%]/.test(p)) s++;
+    return s;
+  })();
+  const strengthLabel = ["", "Weak", "Fair", "Good", "Strong"][passwordStrength];
+  const strengthColor = [
+    "",
+    "bg-red-500",
+    "bg-amber-500",
+    "bg-yellow-400",
+    "bg-emerald-500",
+  ][passwordStrength];
+  const strengthTextColor = [
+    "",
+    "text-red-600",
+    "text-amber-600",
+    "text-yellow-600",
+    "text-emerald-600",
+  ][passwordStrength];
+
   const handleSave = async () => {
     if (!oldPass || !newPass || !confirmPass) {
       onError("All fields are required");
@@ -1473,6 +1605,25 @@ function ChangePasswordModal({
                 </span>
               </button>
             </div>
+            {newPass && (
+              <div className="mt-2 space-y-1.5">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= passwordStrength ? strengthColor : "bg-ds-surface-container-high"
+                        }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-ds-on-surface-variant">
+                  Strength:{" "}
+                  <span className={`font-semibold ${strengthTextColor}`}>
+                    {strengthLabel}
+                  </span>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Confirm Password */}

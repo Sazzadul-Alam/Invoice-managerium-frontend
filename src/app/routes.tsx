@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
+import { ForgotPassword } from "./pages/ForgotPassword";
 import { VerifyEmail } from "./pages/VerifyEmail";
 import { VerifyEmailToken } from "./pages/VerifyEmailToken";
 import { Dashboard } from "./pages/Dashboard";
@@ -15,6 +16,10 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
+  },
+  {
+    path: "/forgot-password",
+    Component: ForgotPassword,
   },
   {
     path: "/register",
