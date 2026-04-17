@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { authApi } from "../auth.utils";
+import { authApi, saveSession } from "../auth.utils";
 
 export function Register() {
   const navigate = useNavigate();
@@ -49,8 +49,10 @@ export function Register() {
         email: formData.email,
         password: formData.password,
         phone: formData.phone,
+      }).then((data) => {
+        saveSession(data.access_token, data.user);
       });
-      navigate("/verify-email", { state: { email: formData.email } });
+      navigate("/shop-setup");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
     } finally {
@@ -235,9 +237,8 @@ export function Register() {
                       {[1, 2, 3, 4].map((i) => (
                         <div
                           key={i}
-                          className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                            i <= passwordStrength ? strengthColor : "bg-ds-surface-container-high"
-                          }`}
+                          className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= passwordStrength ? strengthColor : "bg-ds-surface-container-high"
+                            }`}
                         />
                       ))}
                     </div>

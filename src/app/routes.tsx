@@ -4,6 +4,7 @@ import { Register } from "./pages/Register";
 import { VerifyEmail } from "./pages/VerifyEmail";
 import { VerifyEmailToken } from "./pages/VerifyEmailToken";
 import { Dashboard } from "./pages/Dashboard";
+import { ShopSetup } from "./pages/ShopSetup";
 
 export const router = createBrowserRouter([
   {
@@ -19,6 +20,10 @@ export const router = createBrowserRouter([
     Component: Register,
   },
   {
+    path: "/shop-setup",
+    Component: ShopSetup,
+  },
+  {
     path: "/verify-email",
     Component: VerifyEmail,
   },
@@ -31,4 +36,4 @@ export const router = createBrowserRouter([
     path: "/dashboard",
     Component: Dashboard,
   },
-]);
+]);
