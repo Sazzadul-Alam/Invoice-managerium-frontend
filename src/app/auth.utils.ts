@@ -157,9 +157,12 @@ export interface LoginPayload {
   password: string;
 }
 
+// ─── API Base URL ─────────────────────────────────────────────────────────────
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.memobook.shop/api";
+
 // ─── API calls ────────────────────────────────────────────────────────────────
 
-const BASE = "http://localhost:4000/api/user";
+const BASE = `${API_BASE}/user`;
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -318,7 +321,7 @@ export const authApi = {
 
 // ─── Shop API ─────────────────────────────────────────────────────────────────
 
-const SHOP_BASE = "http://localhost:4000/api/shop";
+const SHOP_BASE = `${API_BASE}/shop`;
 
 export const shopApi = {
   createShop: (payload: {
@@ -370,7 +373,7 @@ export const shopApi = {
 
 // ─── Subscription API ─────────────────────────────────────────────────────────
 
-const SUB_BASE = "http://localhost:4000/api/subscription";
+const SUB_BASE = `${API_BASE}/subscription`;
 
 export const subscriptionApi = {
   /** List all available plans (public) */
