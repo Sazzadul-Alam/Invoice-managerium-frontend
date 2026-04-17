@@ -961,10 +961,10 @@ function TabProfile({
   const memberSince = user?.createdAt ? formatDate(user.createdAt) : "—";
   const subExpiry = mySub?.endDate
     ? new Date(mySub.endDate).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
     : "—";
 
   return (
@@ -999,7 +999,7 @@ function TabProfile({
         >
           {user?.image ? (
             <img
-              src={user.image.startsWith("http") ? user.image : `http://localhost:4000/uploads/image/${user.image}`}
+              src={user.image.startsWith("http") ? user.image : `https://api.memobook.shop/uploads/image/${user.image}`}
               alt="Avatar"
               className="h-full w-full object-cover"
             />
