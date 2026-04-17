@@ -113,6 +113,35 @@ export interface ApiShop {
   updatedAt: string;
 }
 
+export interface ApiSubscriptionPlan {
+  _id: string;
+  name: string;
+  slug: string;
+  description: string;
+  price: number;
+  maxShops: number;
+  maxModeratorsPerShop: number;
+  maxProductsPerShop: number;
+  maxInvoicesPerMonth: number;
+  features: {
+    receiptCustomization: boolean;
+    exportPdf: boolean;
+    analytics: boolean;
+  };
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface ApiBillingCycle {
+  _id: string;
+  name: string;
+  durationInMonths: number;
+  discountAmount: number;
+  isActive: boolean;
+  sortOrder: number;
+  deactivatedAt?: string;
+}
+
 export interface ApiPlan {
   _id: string;
   name: string;
@@ -131,6 +160,7 @@ export interface ApiPlan {
   };
   isActive: boolean;
   sortOrder: number;
+  deactivatedAt?: string;
 }
 
 export interface ApiUserSubscription {
@@ -215,9 +245,9 @@ async function authedGet<T>(url: string): Promise<T> {
   return data as T;
 }
 
-async function authedPut<T>(path: string, body: unknown): Promise<T> {
+async function authedPut<T>(basePath: string, path: string, body: unknown): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${basePath}${path}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -343,6 +373,7 @@ export interface ApiProduct {
   stock: number;
   sold: number;
   rating: number;
+  isDemo: boolean;
   location: string;
   featured: boolean;
   status: "active" | "inactive";
@@ -370,6 +401,7 @@ export const authApi = {
     socialLinks?: Partial<ApiUser["socialLinks"]>;
   }) =>
     authedPut<{ success: boolean; message: string; user: ApiUser }>(
+      BASE,
       "/update-profile",
       payload
     ),
@@ -385,6 +417,7 @@ export const authApi = {
     bio?: string;
   }) =>
     authedPut<{ success: boolean; message: string; user: ApiUser }>(
+      BASE,
       "/update-profile",
       payload
     ),
@@ -396,6 +429,7 @@ export const authApi = {
     confirmPassword: string;
   }) =>
     authedPut<{ success: boolean; message: string }>(
+      BASE,
       "/update-password",
       payload
     ),
@@ -483,9 +517,9 @@ export const subscriptionApi = {
 
   purchase: (payload: {
     planId: string;
+    billingCycleId: string;
     paymentMethod: string;
     paymentReference: string;
-    paymentAmount: number;
   }) =>
     authedPost<{ success: boolean; message: string; subscription: ApiUserSubscription }>(
       SUB_BASE,
@@ -531,7 +565,8 @@ export const adminApi = {
 
   handleSubscription: (id: string, action: "approve" | "reject", rejectionReason?: string) =>
     authedPut<{ success: boolean; message: string; subscription: PopulatedSubscription }>(
-      `/subscription/admin/subscriptions/${id}`,
+      SUB_BASE,
+      `/admin/subscriptions/${id}`,
       { action, rejectionReason }
     ),
 
@@ -547,7 +582,8 @@ export const adminApi = {
 
   updatePlan: (id: string, payload: Partial<ApiPlan>) =>
     authedPut<{ success: boolean; message: string; plan: ApiPlan }>(
-      `/subscription/admin/plans/${id}`,
+      SUB_BASE,
+      `/admin/plans/${id}`,
       payload
     ),
 
@@ -566,6 +602,13 @@ export const adminApi = {
       return data as { success: boolean; message: string };
     });
   },
+
+  togglePlanStatus: (id: string, isActive: boolean) =>
+    authedPut<{ success: boolean; message: string }>(
+      SUB_BASE,
+      `/admin/plans/active-inactive/${id}`,
+      { isActive }
+    ),
 };
 
 // ─── Category API ──────────────────────────────────────────────────────────
@@ -600,8 +643,14 @@ export const brandApi = {
 const PRODUCT_BASE = `${API_BASE}/product`;
 
 export const productApi = {
-  getAll: () =>
-    authedGet<{ success: boolean; products: ApiProduct[]; total: number }>(`${PRODUCT_BASE}/all`),
+  getAll: (demoOnly = false, shopId?: string) => {
+    const params = new URLSearchParams();
+    if (demoOnly) params.set("demoOnly", "true");
+    if (shopId) params.set("shopId", shopId);
+    return authedGet<{ success: boolean; products: ApiProduct[]; total: number }>(
+      `${PRODUCT_BASE}/all?${params.toString()}`
+    );
+  },
   
   create: (formData: FormData) =>
     authedFormDataPost<{ success: boolean; message: string; data: ApiProduct }>(
@@ -635,7 +684,56 @@ export const productApi = {
 
   toggleStatus: (id: string, status: "active" | "inactive") =>
     authedPut<{ success: boolean; message: string; data: ApiProduct }>(
-      `/product/active-inactive/${id}`,
+      PRODUCT_BASE,
+      `/active-inactive/${id}`,
       { status }
+    ),
+};
+
+// ─── Billing Cycle API ──────────────────────────────────────────────────────────
+
+const BILLING_CYCLE_BASE = `${API_BASE}/billing-cycle`;
+
+export const billingCycleApi = {
+  getAll: (activeOnly = false) =>
+    authedGet<{ success: boolean; billingCycles: ApiBillingCycle[] }>(
+      `${BILLING_CYCLE_BASE}/all${activeOnly ? "?activeOnly=true" : ""}`
+    ),
+
+  create: (payload: Partial<ApiBillingCycle>) =>
+    authedPost<{ success: boolean; billingCycle: ApiBillingCycle; message: string }>(
+      BILLING_CYCLE_BASE,
+      `/create`,
+      payload
+    ),
+
+  update: (id: string, payload: Partial<ApiBillingCycle>) =>
+    authedPut<{ success: boolean; message: string }>(
+      BILLING_CYCLE_BASE,
+      `/${id}`,
+      payload
+    ),
+
+  delete: (id: string) => {
+    const token = getToken();
+    return fetch(`${BILLING_CYCLE_BASE}/${id}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: "include",
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Failed to delete billing cycle");
+      return data as { success: boolean; message: string };
+    });
+  },
+
+  toggleStatus: (id: string, isActive: boolean) =>
+    authedPut<{ success: boolean; message: string }>(
+      BILLING_CYCLE_BASE,
+      `/active-inactive/${id}`,
+      { isActive }
     ),
 };

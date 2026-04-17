@@ -4,6 +4,7 @@ import {
   varientAttributeApi,
   ApiProduct,
   ApiUserSubscription,
+  ApiShop,
 } from "../auth.utils";
 
 const API_IMAGE_URL = import.meta.env.VITE_API_BASE_URL
@@ -12,8 +13,10 @@ const API_IMAGE_URL = import.meta.env.VITE_API_BASE_URL
 
 export function ProductManagement({
   mySub,
+  shop,
 }: {
   mySub: ApiUserSubscription | null;
+  shop: ApiShop | null;
 }) {
   const maxProducts = mySub?.planId?.maxProductsPerShop ?? 10;
   const planName = mySub?.planId?.name ?? "Free";
@@ -41,11 +44,21 @@ export function ProductManagement({
 
   const fetchPrimaryData = async () => {
     try {
-      const [prodRes, varRes] = await Promise.all([
-        productApi.getAll(),
+      const isFreePlan = planName.toLowerCase() === "free";
+      
+      const [prodRes, demoRes, varRes] = await Promise.all([
+        shop?._id ? productApi.getAll(false, shop._id) : Promise.resolve({ success: true, products: [], total: 0 }),
+        isFreePlan ? productApi.getAll(true) : Promise.resolve({ success: true, products: [], total: 0 }),
         varientAttributeApi.getAll(),
       ]);
-      if (prodRes.success) setProducts(prodRes.products);
+
+      let finalProducts: ApiProduct[] = [];
+      if (prodRes.success) finalProducts = [...prodRes.products];
+      if (demoRes.success && demoRes.products.length > 0) {
+        finalProducts = [...finalProducts, ...demoRes.products];
+      }
+
+      setProducts(finalProducts);
       if (varRes.success) setVarients(varRes.attributes);
     } catch (err: any) {
       console.error(err);
@@ -57,7 +70,7 @@ export function ProductManagement({
 
   useEffect(() => {
     fetchPrimaryData();
-  }, []);
+  }, [shop?._id]);
 
   const showToast = (msg: string, type: "success" | "error") => {
     setToast({ msg, type });
@@ -103,6 +116,7 @@ export function ProductManagement({
     setIsSubmitting(true);
     const fd = new FormData();
     fd.append("name", formData.name);
+    if (shop?._id) fd.append("shopId", shop._id);
     fd.append("varientId", formData.varientId);
     fd.append("description", formData.description);
     fd.append("price", formData.price);
@@ -234,31 +248,42 @@ export function ProductManagement({
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
-                  <span
-                    className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                    style={{
-                      background: product.status === "active" ? "rgba(0,92,114,0.1)" : "var(--ds-surface-container-high)",
-                      color: product.status === "active" ? "var(--ds-primary-container)" : "var(--ds-outline)",
-                    }}
-                  >
-                    {product.status}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenEdit(product)}
-                      className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-base">edit</span>
-                    </button>
-                    <button
-                      onClick={() => handleDelete(product._id)}
-                      className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-base">delete</span>
-                    </button>
+                  <div className="flex flex-col items-end gap-2">
+                    {product.isDemo ? (
+                      <span
+                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                        style={{ background: "#e0f2f1", color: "#00796b" }}
+                      >
+                        DEMO
+                      </span>
+                    ) : (
+                      <span
+                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                        style={{
+                          background: product.status === "active" ? "rgba(0,92,114,0.1)" : "var(--ds-surface-container-high)",
+                          color: product.status === "active" ? "var(--ds-primary-container)" : "var(--ds-outline)",
+                        }}
+                      >
+                        {product.status}
+                      </span>
+                    )}
+                    {!product.isDemo && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(product)}
+                          className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-base">edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product._id)}
+                          className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-base">delete</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
               </div>
             ))
           )}

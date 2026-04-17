@@ -8,6 +8,8 @@ import {
   authApi,
   shopApi,
   subscriptionApi,
+  billingCycleApi,
+  type ApiBillingCycle,
 } from "../auth.utils";
 import { ProductManagement } from "./ProductManagement";
 
@@ -187,21 +189,24 @@ export function Dashboard() {
   const [user, setUser] = useState<ApiUser | null>(null);
   const [shop, setShop] = useState<ApiShop | null>(null);
   const [plans, setPlans] = useState<ApiPlan[]>([]);
+  const [cycles, setCycles] = useState<ApiBillingCycle[]>([]);
   const [mySub, setMySub] = useState<ApiUserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
-      const [userRes, shopsRes, plansRes, subRes] = await Promise.all([
+      const [userRes, shopsRes, plansRes, subRes, cyclesRes] = await Promise.all([
         authApi.me(),
         shopApi.myShops(),
         subscriptionApi.listPlans(),
         subscriptionApi.mySubscription(),
+        billingCycleApi.getAll(true),
       ]);
       setUser(userRes.user);
       // Use first owned shop as primary
       setShop(shopsRes.ownedShops[0] ?? null);
       setPlans(plansRes.plans);
+      setCycles(cyclesRes.billingCycles);
       setMySub(subRes.subscription);
     } catch (err) {
       console.error("Dashboard fetch error:", err);
@@ -298,12 +303,13 @@ export function Dashboard() {
           <TabBuyPlan
             user={user}
             plans={plans}
+            cycles={cycles}
             mySub={mySub}
             currentPlanSlug={currentPlanSlug}
             onRefresh={fetchData}
           />
         )}
-        {activeTab === "products" && <ProductManagement mySub={mySub} />}
+        {activeTab === "products" && <ProductManagement mySub={mySub} shop={shop} />}
         {activeTab === "invoice" && <TabDemoInvoice shop={shop} />}
         {activeTab === "profile" && (
           <TabProfile
@@ -379,12 +385,14 @@ export function Dashboard() {
 function TabBuyPlan({
   user,
   plans,
+  cycles,
   mySub,
   currentPlanSlug,
   onRefresh,
 }: {
   user: ApiUser | null;
   plans: ApiPlan[];
+  cycles: ApiBillingCycle[];
   mySub: ApiUserSubscription | null;
   currentPlanSlug: string;
   onRefresh: () => void;
@@ -393,14 +401,23 @@ function TabBuyPlan({
   const subStatus = mySub?.status;
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedCycleId, setSelectedCycleId] = useState<string>("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [transactionId, setTransactionId] = useState("");
   const [loadingPurchase, setLoadingPurchase] = useState(false);
   const [toast, setToast] = useState("");
 
+  useEffect(() => {
+    if (cycles.length > 0 && !selectedCycleId) {
+      setSelectedCycleId(cycles[0]._id);
+    }
+  }, [cycles, selectedCycleId]);
+
+  const activeCycle = cycles.find(c => c._id === selectedCycleId);
+
   const handlePurchase = async (plan: ApiPlan) => {
-    if (!mobileNumber || !transactionId) {
-      setToast("Mobile number and Transaction ID are required.");
+    if (!mobileNumber || !transactionId || !selectedCycleId) {
+      setToast("Mobile number, Transaction ID, and Billing Cycle are required.");
       setTimeout(() => setToast(""), 3000);
       return;
     }
@@ -408,9 +425,9 @@ function TabBuyPlan({
     try {
       await subscriptionApi.purchase({
         planId: plan._id,
+        billingCycleId: selectedCycleId,
         paymentMethod: "bKash",
         paymentReference: `${mobileNumber} - ${transactionId}`,
-        paymentAmount: plan.price,
       });
       setToast("Upgrade requested successfully. Waiting for admin approval.");
       setTimeout(() => setToast(""), 3000);
@@ -472,6 +489,25 @@ function TabBuyPlan({
         <p className="text-sm text-ds-outline text-center py-8">No plans available.</p>
       )}
 
+      {plans.length > 0 && cycles.length > 0 && (
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+          {cycles.map(cycle => (
+            <button
+              key={cycle._id}
+              onClick={() => setSelectedCycleId(cycle._id)}
+              className="px-4 py-2 rounded-full border text-sm font-bold whitespace-nowrap transition-all"
+              style={{
+                background: selectedCycleId === cycle._id ? "var(--ds-primary-container)" : "transparent",
+                color: selectedCycleId === cycle._id ? "var(--ds-on-primary)" : "var(--ds-on-surface-variant)",
+                borderColor: selectedCycleId === cycle._id ? "var(--ds-primary)" : "var(--ds-outline-variant)",
+              }}
+            >
+              {cycle.name} {cycle.discountAmount > 0 ? `(Save ৳${cycle.discountAmount})` : ""}
+            </button>
+          ))}
+        </div>
+      )}
+
       {plans.map((plan) => {
         const isCurrent = plan.slug === currentPlanSlug;
         const color = planColor(plan.slug);
@@ -517,9 +553,11 @@ function TabBuyPlan({
                 ) : (
                   <div>
                     <span className="text-xl font-bold" style={{ color }}>
-                      ৳{plan.price}
+                      ৳{activeCycle ? Math.max(0, (plan.price * activeCycle.durationInMonths) - activeCycle.discountAmount) : plan.price}
                     </span>
-                    <span className="text-xs text-ds-outline">/{plan.billingCycle === "yearly" ? "yr" : "mo"}</span>
+                    <span className="text-xs text-ds-outline">
+                      /{activeCycle ? activeCycle.name.toLowerCase() : "mo"}
+                    </span>
                   </div>
                 )}
               </div>

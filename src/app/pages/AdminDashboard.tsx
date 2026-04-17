@@ -8,6 +8,8 @@ import {
   type SubStats,
   type PopulatedSubscription,
   type ApiPlan,
+  billingCycleApi,
+  type ApiBillingCycle,
 } from "../auth.utils";
 
 /* ── tiny helpers ─────────────────────────────────────────────────── */
@@ -268,14 +270,25 @@ export function AdminDashboard() {
   );
 
   const PlansTab = () => {
+    const [subTab, setSubTab] = useState<"plans" | "cycles">("plans");
+    
+    // --- Plans State ---
     const [plans, setPlans] = useState<ApiPlan[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
     const [formData, setFormData] = useState<Partial<ApiPlan>>({
-      name: "", slug: "", description: "", price: 0, billingCycle: "monthly",
-      maxShops: 1, maxModeratorsPerShop: 0, maxProductsPerShop: 10, maxInvoicesPerMonth: 20,
+      name: "", description: "", price: undefined,
+      maxShops: undefined, maxModeratorsPerShop: undefined, maxProductsPerShop: undefined, maxInvoicesPerMonth: undefined,
       isActive: true, sortOrder: 0,
       features: { receiptCustomization: false, exportPdf: false, analytics: false }
+    });
+
+    // --- Cycles State ---
+    const [cycles, setCycles] = useState<ApiBillingCycle[]>([]);
+    const [loadingCycles, setLoadingCycles] = useState(false);
+    const [showAddCycle, setShowAddCycle] = useState(false);
+    const [cycleData, setCycleData] = useState<Partial<ApiBillingCycle>>({
+      name: "", durationInMonths: undefined, discountAmount: undefined, isActive: true, sortOrder: 0
     });
 
     const loadPlans = useCallback(async () => {
@@ -287,12 +300,28 @@ export function AdminDashboard() {
       setLoadingPlans(false);
     }, []);
 
-    useEffect(() => { loadPlans(); }, [loadPlans]);
+    const loadCycles = useCallback(async () => {
+      setLoadingCycles(true);
+      try {
+        const r = await billingCycleApi.getAll();
+        setCycles(r.billingCycles);
+      } catch (e) { console.error(e); }
+      setLoadingCycles(false);
+    }, []);
+
+    useEffect(() => { 
+      if (subTab === "plans") loadPlans(); 
+      else loadCycles();
+    }, [loadPlans, loadCycles, subTab]);
 
     const handleCreate = async (e: React.FormEvent) => {
       e.preventDefault();
       try {
-        const r = await adminApi.createPlan(formData);
+        // Auto-generate slug from name
+        const slug = formData.name?.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+        const payload = { ...formData, slug };
+        
+        const r = await adminApi.createPlan(payload);
         setToast(r.message);
         setTimeout(() => setToast(""), 2600);
         setShowAdd(false);
@@ -303,12 +332,70 @@ export function AdminDashboard() {
       }
     };
 
+    const togglePlanStatus = async (id: string, isActive: boolean) => {
+      try {
+        const r = await adminApi.togglePlanStatus(id, isActive);
+        setToast(r.message);
+        setTimeout(() => setToast(""), 2600);
+        loadPlans();
+      } catch (err: any) {
+        setToast(err.message);
+        setTimeout(() => setToast(""), 2600);
+      }
+    };
+
+    const handleCreateCycle = async (e: React.FormEvent) => {
+      e.preventDefault();
+      try {
+        const r = await billingCycleApi.create(cycleData);
+        setToast(r.message);
+        setTimeout(() => setToast(""), 2600);
+        setShowAddCycle(false);
+        loadCycles();
+      } catch (err: any) {
+        setToast(err.message);
+        setTimeout(() => setToast(""), 2600);
+      }
+    };
+
+    const toggleCycleStatus = async (id: string, isActive: boolean) => {
+      try {
+        const r = await billingCycleApi.toggleStatus(id, isActive);
+        setToast(r.message);
+        setTimeout(() => setToast(""), 2600);
+        loadCycles();
+      } catch (err: any) {
+        setToast(err.message);
+        setTimeout(() => setToast(""), 2600);
+      }
+    };
+
     return (
       <div style={{ padding: "20px 16px 100px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)", margin: 0 }}>
-            Subscription Plans
-          </h1>
+        <div style={{ display: "flex", gap: 12, marginBottom: 20, borderBottom: "1px solid var(--ds-outline-variant)" }}>
+          <button onClick={() => setSubTab("plans")} style={{
+            background: "none", border: "none", padding: "8px 0", cursor: "pointer",
+            fontWeight: subTab === "plans" ? 800 : 600, fontSize: 16,
+            color: subTab === "plans" ? "var(--ds-primary)" : "var(--ds-on-surface-variant)",
+            borderBottom: subTab === "plans" ? "3px solid var(--ds-primary)" : "3px solid transparent",
+            fontFamily: "var(--font-headline)"
+          }}>Pricing Plans</button>
+          
+          <button onClick={() => setSubTab("cycles")} style={{
+            background: "none", border: "none", padding: "8px 0", cursor: "pointer",
+            fontWeight: subTab === "cycles" ? 800 : 600, fontSize: 16,
+            color: subTab === "cycles" ? "var(--ds-primary)" : "var(--ds-on-surface-variant)",
+            borderBottom: subTab === "cycles" ? "3px solid var(--ds-primary)" : "3px solid transparent",
+            fontFamily: "var(--font-headline)"
+          }}>Billing Cycles</button>
+        </div>
+
+        {subTab === "plans" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)", margin: 0 }}>
+                Subscription Plans
+              </h1>
           <button onClick={() => setShowAdd(!showAdd)} style={{
             background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
             border: "none", padding: "6px 12px", borderRadius: 12, fontSize: 13, fontWeight: 600,
@@ -324,47 +411,44 @@ export function AdminDashboard() {
             borderRadius: 16, padding: 16, marginBottom: 20
           }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>Create New Plan</h2>
-            <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+            <form onSubmit={handleCreate} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Name</label>
-                  <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Slug</label>
-                  <input required value={formData.slug} onChange={e => setFormData({ ...formData, slug: e.target.value })}
+                  <input required autoComplete="off" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
                     style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Price</label>
-                  <input required type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: Number(e.target.value) })}
+                  <input required autoComplete="off" type="number" value={formData.price ?? ""} onChange={e => setFormData({ ...formData, price: e.target.value === "" ? undefined : Number(e.target.value) })}
                     style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Billing Cycle</label>
-                  <select value={formData.billingCycle} onChange={e => setFormData({ ...formData, billingCycle: e.target.value })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }}>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                    <option value="lifetime">Lifetime</option>
-                  </select>
                 </div>
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Description</label>
-                <input required value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
+                <input required autoComplete="off" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
                   style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Shops</label>
-                  <input required type="number" value={formData.maxShops} onChange={e => setFormData({ ...formData, maxShops: Number(e.target.value) })}
+                  <input required autoComplete="off" type="number" value={formData.maxShops ?? ""} onChange={e => setFormData({ ...formData, maxShops: e.target.value === "" ? undefined : Number(e.target.value) })}
                     style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Products/Shop</label>
-                  <input required type="number" value={formData.maxProductsPerShop} onChange={e => setFormData({ ...formData, maxProductsPerShop: Number(e.target.value) })}
+                  <input required autoComplete="off" type="number" value={formData.maxProductsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxProductsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Moderators/Shop</label>
+                  <input required autoComplete="off" type="number" value={formData.maxModeratorsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxModeratorsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Invoices/Month</label>
+                  <input required autoComplete="off" type="number" value={formData.maxInvoicesPerMonth ?? ""} onChange={e => setFormData({ ...formData, maxInvoicesPerMonth: e.target.value === "" ? undefined : Number(e.target.value) })}
                     style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
                 </div>
               </div>
@@ -389,22 +473,148 @@ export function AdminDashboard() {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--ds-primary)" }}>{p.name}</h3>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--ds-primary)" }}>{p.name}</h3>
+                      <span style={{
+                        padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                        background: p.isActive ? "#e8f5e9" : "#ffebee", color: p.isActive ? "#2e7d32" : "#c62828"
+                      }}>
+                        {p.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
                     <span style={{ fontSize: 11, color: "var(--ds-on-surface-variant)", background: "var(--ds-surface-container-high)", padding: "2px 8px", borderRadius: 10 }}>{p.slug}</span>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 16, fontWeight: 800 }}>৳{fmt(p.price)}</div>
-                    <div style={{ fontSize: 10, color: "var(--ds-on-surface-variant)", textTransform: "uppercase" }}>{p.billingCycle}</div>
+                    <div style={{ fontSize: 16, fontWeight: 800 }}>৳{fmt(p.price)} /mo Base</div>
                   </div>
                 </div>
                 <p style={{ fontSize: 12, margin: "0 0 12px", color: "var(--ds-on-surface-variant)" }}>{p.description}</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11 }}>
-                  <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Shops: {p.maxShops === -1 ? "∞" : p.maxShops}</span>
-                  <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Products: {p.maxProductsPerShop === -1 ? "∞" : p.maxProductsPerShop}</span>
-                  <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Invoices: {p.maxInvoicesPerMonth === -1 ? "∞" : p.maxInvoicesPerMonth}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                  <div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11 }}>
+                      <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Shops: {p.maxShops === -1 ? "∞" : p.maxShops}</span>
+                      <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Products: {p.maxProductsPerShop === -1 ? "∞" : p.maxProductsPerShop}</span>
+                      <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Invoices: {p.maxInvoicesPerMonth === -1 ? "∞" : p.maxInvoicesPerMonth}</span>
+                    </div>
+                    {!p.isActive && p.deactivatedAt && (
+                      <div style={{ fontSize: 10, color: "var(--ds-on-surface-variant)", marginTop: 6 }}>
+                        Deactivated on: {new Date(p.deactivatedAt).toLocaleDateString()} {new Date(p.deactivatedAt).toLocaleTimeString()}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => togglePlanStatus(p._id, !p.isActive)} style={{
+                    background: p.isActive ? "transparent" : "var(--ds-primary-container)",
+                    color: p.isActive ? "var(--ds-on-surface-variant)" : "var(--ds-on-primary)",
+                    padding: "6px 12px", borderRadius: 10, border: p.isActive ? "1px solid var(--ds-outline-variant)" : "none",
+                    cursor: "pointer", fontSize: 12, fontWeight: 600
+                  }}>
+                    {p.isActive ? "Deactivate" : "Activate"}
+                  </button>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    )}
+
+        {subTab === "cycles" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)", margin: 0 }}>
+                Billing Cycles
+              </h1>
+              <button onClick={() => setShowAddCycle(!showAddCycle)} style={{
+                background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
+                border: "none", padding: "6px 12px", borderRadius: 12, fontSize: 13, fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 4, cursor: "pointer"
+              }}>
+                <Icon name={showAddCycle ? "close" : "add"} style={{ fontSize: 18 }} /> {showAddCycle ? "Cancel" : "Add Cycle"}
+              </button>
+            </div>
+
+            {showAddCycle && (
+              <div style={{
+                background: "var(--ds-surface-container-lowest)", border: "1px solid var(--ds-outline-variant)",
+                borderRadius: 16, padding: 16, marginBottom: 20
+              }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>Create New Cycle</h2>
+                <form onSubmit={handleCreateCycle} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Cycle Name (e.g., Monthly)</label>
+                      <input required autoComplete="off" value={cycleData.name} onChange={e => setCycleData({ ...cycleData, name: e.target.value })}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Duration (Months)</label>
+                        <input required autoComplete="off" type="number" min={1} value={cycleData.durationInMonths ?? ""} onChange={e => setCycleData({ ...cycleData, durationInMonths: e.target.value === "" ? undefined : Number(e.target.value) })}
+                          style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Discount (Flat Amount)</label>
+                        <input required autoComplete="off" type="number" min={0} value={cycleData.discountAmount ?? ""} onChange={e => setCycleData({ ...cycleData, discountAmount: e.target.value === "" ? undefined : Number(e.target.value) })}
+                          style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                      </div>
+                    </div>
+                  </div>
+                  <button type="submit" style={{
+                    background: "var(--ds-primary)", color: "white", padding: "10px", borderRadius: 8,
+                    border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 8
+                  }}>
+                    Save Cycle
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {loadingCycles ? (
+              <div style={{ textAlign: "center", padding: 40, color: "var(--ds-on-surface-variant)" }}>Loading cycles…</div>
+            ) : cycles.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 40, color: "var(--ds-on-surface-variant)" }}>No billing cycles created.</div>
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                {cycles.map(c => (
+                  <div key={c._id} style={{
+                    background: "var(--ds-surface-container-lowest)", border: "1px solid var(--ds-outline-variant)",
+                    borderRadius: 16, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center"
+                  }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--ds-on-surface)" }}>
+                        {c.name} <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ds-on-surface-variant)", marginLeft: 6 }}>({c.durationInMonths} Months)</span>
+                      </h3>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                        <span style={{
+                          padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                          background: c.isActive ? "#e8f5e9" : "#ffebee", color: c.isActive ? "#2e7d32" : "#c62828"
+                        }}>
+                          {c.isActive ? "Active" : "Inactive"}
+                        </span>
+                        <span style={{ fontSize: 13, color: "var(--ds-on-surface-variant)" }}>
+                          Discount: ৳{fmt(c.discountAmount)}
+                        </span>
+                      </div>
+                      {!c.isActive && c.deactivatedAt && (
+                        <div style={{ fontSize: 10, color: "var(--ds-on-surface-variant)", marginTop: 6 }}>
+                          Deactivated on: {new Date(c.deactivatedAt).toLocaleDateString()} {new Date(c.deactivatedAt).toLocaleTimeString()}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => toggleCycleStatus(c._id, !c.isActive)} style={{
+                        background: c.isActive ? "transparent" : "var(--ds-primary-container)",
+                        color: c.isActive ? "var(--ds-on-surface-variant)" : "var(--ds-on-primary)",
+                        padding: "6px 12px", borderRadius: 10, border: c.isActive ? "1px solid var(--ds-outline-variant)" : "none",
+                        cursor: "pointer", fontSize: 12, fontWeight: 600
+                      }}>
+                        {c.isActive ? "Deactivate" : "Activate"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
