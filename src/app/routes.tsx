@@ -5,6 +5,7 @@ import { VerifyEmail } from "./pages/VerifyEmail";
 import { VerifyEmailToken } from "./pages/VerifyEmailToken";
 import { Dashboard } from "./pages/Dashboard";
 import { ShopSetup } from "./pages/ShopSetup";
+import { AdminDashboard } from "./pages/AdminDashboard";
 
 export const router = createBrowserRouter([
   {
@@ -35,5 +36,9 @@ export const router = createBrowserRouter([
   {
     path: "/dashboard",
     Component: Dashboard,
+  },
+  {
+    path: "/admin/dashboard",
+    Component: AdminDashboard,
   },
 ]);

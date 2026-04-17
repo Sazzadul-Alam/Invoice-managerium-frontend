@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // ─── JWT helpers ──────────────────────────────────────────────────────────────
 
 export interface JwtPayload {
@@ -386,7 +387,6 @@ export const subscriptionApi = {
       `${SUB_BASE}/my`
     ),
 
-  /** Purchase a plan (submit payment reference) */
   purchase: (payload: {
     planId: string;
     paymentMethod: string;
@@ -398,4 +398,78 @@ export const subscriptionApi = {
       "/purchase",
       payload
     ),
+};
+
+// ─── Admin Subscription API ──────────────────────────────────────────────────
+
+export interface SubStats {
+  pending: number;
+  active: number;
+  revenue: number;
+}
+
+export interface PopulatedSubscription {
+  _id: string;
+  userId: { _id: string; name: string; email: string; phone: string; image: string } | null;
+  planId: { _id: string; name: string; price: number; billingCycle: string } | null;
+  status: "pending" | "active" | "expired" | "cancelled";
+  paymentMethod: string;
+  paymentReference: string;
+  paymentAmount: number;
+  startDate: string | null;
+  endDate: string | null;
+  rejectionReason: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const adminApi = {
+  getStats: () =>
+    authedGet<{ success: boolean; stats: SubStats }>(`${SUB_BASE}/admin/stats`),
+
+  listSubscriptions: (status?: string, page = 1, limit = 20) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (status) params.set("status", status);
+    return authedGet<{ success: boolean; subscriptions: PopulatedSubscription[]; total: number }>(
+      `${SUB_BASE}/admin/subscriptions?${params}`
+    );
+  },
+
+  handleSubscription: (id: string, action: "approve" | "reject", rejectionReason?: string) =>
+    authedPut<{ success: boolean; message: string; subscription: PopulatedSubscription }>(
+      `/subscription/admin/subscriptions/${id}`,
+      { action, rejectionReason }
+    ),
+
+  listPlans: () =>
+    authedGet<{ success: boolean; plans: ApiPlan[] }>(`${SUB_BASE}/plans`),
+
+  createPlan: (payload: Partial<ApiPlan>) =>
+    authedPost<{ success: boolean; message: string; plan: ApiPlan }>(
+      SUB_BASE,
+      "/admin/plans",
+      payload
+    ),
+
+  updatePlan: (id: string, payload: Partial<ApiPlan>) =>
+    authedPut<{ success: boolean; message: string; plan: ApiPlan }>(
+      `/subscription/admin/plans/${id}`,
+      payload
+    ),
+
+  deletePlan: (id: string) => {
+    const token = getToken();
+    return fetch(`${API_BASE}/subscription/admin/plans/${id}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: "include",
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Failed to delete plan");
+      return data as { success: boolean; message: string };
+    });
+  },
 };

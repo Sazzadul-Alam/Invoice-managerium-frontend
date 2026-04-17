@@ -23,7 +23,11 @@ export function Login() {
     try {
       const data = await authApi.login({ email, password });
       saveSession(data.access_token, data.user);
-      navigate("/dashboard");
+      if (data.user.role === "admin") {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Sign in failed. Please try again.");
     } finally {
