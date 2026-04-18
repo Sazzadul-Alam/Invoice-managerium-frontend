@@ -7,9 +7,8 @@ import {
   ApiShop,
 } from "../auth.utils";
 
-const API_IMAGE_URL = import.meta.env.VITE_API_BASE_URL
-  ? import.meta.env.VITE_API_BASE_URL.replace("/api", "") + "/image/"
-  : "https://api.memobook.shop/image/";
+const API_IMAGE_URL = (import.meta.env.VITE_API_BASE_URL || "https://api.memobook.shop/api")
+  .replace(/\/api\/?$/, "") + "/image/";
 
 export function ProductManagement({
   mySub,
