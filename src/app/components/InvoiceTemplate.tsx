@@ -17,6 +17,7 @@ export interface InvoiceTemplateProps {
   items: { name: string; qty: number; price: number }[];
   subtotal: number;
   discount: number;
+  advanceAmount?: number;
   grandTotal: number;
 
   notes?: string;
@@ -37,6 +38,7 @@ export function InvoiceTemplate({
   items,
   subtotal,
   discount,
+  advanceAmount = 0,
   grandTotal,
   notes,
   isDemo,
@@ -153,6 +155,12 @@ export function InvoiceTemplate({
             <span>−৳{discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         )}
+        {advanceAmount > 0 && (
+          <div className="flex justify-between text-xs text-ds-error">
+            <span>Advance Paid</span>
+            <span>−৳{advanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+        )}
       </div>
 
       {/* Grand total */}
@@ -185,11 +193,11 @@ export function InvoiceTemplate({
       {/* Footer — Thank you + Social Links */}
       <div className="text-center px-5 py-4 space-y-2.5">
         {notes && (
-          <p className="text-xs text-ds-outline mb-2 italic">
+          <p className="text-xs text-ds-outline mb-2 font-bold">
             Note: {notes}
           </p>
         )}
-        <p className="text-ds-on-surface text-xs font-semibold">
+        <p className="text-ds-on-surface text-xs font-normal">
           {footerText || "Thank you for your purchase!"}
         </p>
 

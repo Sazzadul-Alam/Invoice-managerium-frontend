@@ -28,6 +28,7 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
   const [cart, setCart] = useState<{ product: ApiProduct; quantity: number }[]>([]);
   const [discountType, setDiscountType] = useState<"flat" | "percentage">("flat");
   const [discountValue, setDiscountValue] = useState<number>(0);
+  const [advanceAmount, setAdvanceAmount] = useState<number>(0);
   const [notes, setNotes] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -83,7 +84,7 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
 
   const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
   const discountAmount = discountType === "percentage" ? (subtotal * discountValue) / 100 : discountValue;
-  const grandTotal = Math.max(0, subtotal - discountAmount);
+  const grandTotal = Math.max(0, subtotal - discountAmount - advanceAmount);
 
   const handleCreate = async (triggerPrint = false) => {
     if (!shop) return;
@@ -108,7 +109,7 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
       
       await invoiceApi.createInvoice(shop._id, {
         customerName, customerPhone, customerEmail, customerAddress, 
-        items, discountType, discount: discountValue, notes,
+        items, discountType, discount: discountValue, advanceAmount, notes,
         status: triggerPrint ? "printed" : "issued"
       });
 
@@ -122,12 +123,12 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
         if (triggerPrint) {
           setTimeout(() => {
             window.print();
-            setTimeout(() => {
-              setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setNotes("");
-            }, 1000);
+              setTimeout(() => {
+                setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
+              }, 1000);
           }, 300);
         } else {
-          setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setNotes("");
+          setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
         }
       }
     }
@@ -283,6 +284,18 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
            )}
         </div>
 
+        <div className="flex items-center justify-between">
+           <span className="text-sm font-semibold text-ds-on-surface-variant">Advance Payment</span>
+           <input
+             type="number"
+             min="0"
+             value={advanceAmount || ""}
+             onChange={(e) => setAdvanceAmount(Number(e.target.value))}
+             placeholder="0"
+             className="w-24 text-right border border-ds-outline-variant rounded-lg text-sm px-2 py-1 outline-none bg-ds-surface-container-low"
+           />
+        </div>
+
         <div className="border-t border-ds-outline-variant pt-3 flex items-center justify-between">
            <span className="text-sm font-bold uppercase text-ds-primary tracking-widest">Grand Total</span>
            <span className="text-lg font-extrabold text-ds-primary">৳{grandTotal.toFixed(2)}</span>
@@ -351,6 +364,7 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
                   items={cart.map(c => ({ name: c.product.name, qty: c.quantity, price: c.product.price }))}
                   subtotal={subtotal}
                   discount={discountAmount}
+                  advanceAmount={advanceAmount}
                   grandTotal={grandTotal}
                   notes={notes}
                />
@@ -396,6 +410,7 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
             items={cart.map(c => ({ name: c.product.name, qty: c.quantity, price: c.product.price }))}
             subtotal={subtotal}
             discount={discountAmount}
+            advanceAmount={advanceAmount}
             grandTotal={grandTotal}
             notes={notes}
          />
