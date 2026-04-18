@@ -141,8 +141,14 @@ export function AdminDashboard() {
               {s.userId?.name || "Unknown User"}
             </div>
             <div style={{ fontSize: 12, color: "var(--ds-on-surface-variant)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {s.userId?.email || "—"}
+              {s.userId?.phone || s.userId?.email || "—"}
             </div>
+            {s.shopName && (
+              <div style={{ fontSize: 11, color: "var(--ds-primary)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>
+                <Icon name="storefront" style={{ fontSize: 13, verticalAlign: "middle", marginRight: 2 }} />
+                Shop: {s.shopName}
+              </div>
+            )}
           </div>
           <span style={{
             fontSize: 11, fontWeight: 600, padding: "3px 10px",
@@ -159,8 +165,19 @@ export function AdminDashboard() {
           <div><span style={{ opacity: .6 }}>Plan:</span> <b style={{ color: "var(--ds-on-surface)" }}>{s.planId?.name || "—"}</b></div>
           <div><span style={{ opacity: .6 }}>Amount:</span> <b style={{ color: "var(--ds-on-surface)" }}>৳{fmt(s.paymentAmount)}</b></div>
           <div><span style={{ opacity: .6 }}>Method:</span> {s.paymentMethod}</div>
-          <div><span style={{ opacity: .6 }}>Ref:</span> {s.paymentReference || "—"}</div>
-          <div style={{ gridColumn: "1/-1" }}><span style={{ opacity: .6 }}>Submitted:</span> {ago(s.createdAt)}</div>
+          <div style={{ gridColumn: "1/-1" }}>
+            <span style={{ opacity: .6 }}>Ref:</span> 
+            {s.paymentReference && s.paymentReference.includes(" - ") ? (
+              <span style={{ color: "var(--ds-on-surface)", marginLeft: 4 }}>
+               No: <b style={{ background: "var(--ds-surface-container-high)", padding: "2px 6px", borderRadius: 4 }}>{s.paymentReference.split(" - ")[0]}</b>
+               <span style={{ margin: "0 6px", opacity: 0.5 }}>|</span> 
+               TrxID: <b style={{ background: "var(--ds-surface-container-high)", padding: "2px 6px", borderRadius: 4 }}>{s.paymentReference.split(" - ")[1]}</b>
+              </span>
+            ) : (
+               <span style={{ marginLeft: 4 }}>{s.paymentReference || "—"}</span>
+            )}
+          </div>
+          <div style={{ gridColumn: "1/-1", marginTop: 4 }}><span style={{ opacity: .6 }}>Submitted:</span> {ago(s.createdAt)}</div>
         </div>
 
         {/* actions */}

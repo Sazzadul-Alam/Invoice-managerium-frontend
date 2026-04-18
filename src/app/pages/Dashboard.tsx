@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import {
   type ApiUser,
   type ApiShop,
@@ -79,14 +79,21 @@ const DEMO_INVOICE_ITEMS = [
 /*  Tabs                                                                     */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-const TABS = [
+const BASE_TABS = [
   { key: "plan", icon: "workspace_premium", label: "Buy Plan" },
   { key: "products", icon: "inventory_2", label: "Products" },
   { key: "invoice", icon: "receipt_long", label: "Demo Invoice" },
   { key: "profile", icon: "manage_accounts", label: "Profile" },
-] as const;
+];
 
-type TabKey = (typeof TABS)[number]["key"];
+const ACTIVE_SUBSCRIPTION_TABS = [
+  { key: "create_invoice", icon: "add_shopping_cart", label: "Create Invoice" },
+  { key: "products", icon: "inventory_2", label: "Products" },
+  { key: "history", icon: "history", label: "Invoice History" },
+  { key: "profile", icon: "manage_accounts", label: "Profile" },
+];
+
+type TabKey = string;
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Helpers                                                                  */
@@ -181,9 +188,14 @@ function planFeatures(plan: ApiPlan): string[] {
 /*  Root Dashboard                                                            */
 /* ════════════════════════════════════════════════════════════════════════════ */
 
+import { TabCreateInvoice } from "./TabCreateInvoice";
+import { TabInvoiceHistory } from "./TabInvoiceHistory";
+import { InvoiceTemplate } from "../components/InvoiceTemplate";
+
 export function Dashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabKey>("plan");
+  const { tab } = useParams<{ tab?: string }>();
+  const activeTab = tab || "plan";
 
   // ── API state ──
   const [user, setUser] = useState<ApiUser | null>(null);
@@ -219,6 +231,21 @@ export function Dashboard() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (!loading) {
+      const isActiveSubscriber = mySub?.status === "active";
+      if (!tab) {
+        navigate(isActiveSubscriber ? "/dashboard/create_invoice" : "/dashboard/plan", { replace: true });
+        return;
+      }
+      if (isActiveSubscriber && (activeTab === "plan" || activeTab === "invoice")) {
+        navigate("/dashboard/create_invoice", { replace: true });
+      } else if (!isActiveSubscriber && (activeTab === "create_invoice" || activeTab === "history")) {
+        navigate("/dashboard/plan", { replace: true });
+      }
+    }
+  }, [loading, mySub?.status, tab, activeTab, navigate]);
+
   const handleLogout = () => {
     sessionStorage.clear();
     navigate("/login");
@@ -251,26 +278,16 @@ export function Dashboard() {
     >
       {/* ── Top App Bar ── */}
       <header
-        className="sticky top-0 z-30 bg-ds-surface-container-lowest/95 backdrop-blur-md border-b border-ds-outline-variant/50"
+        className="sticky top-0 z-30 bg-ds-surface-container-lowest/95 backdrop-blur-md border-b border-ds-outline-variant/50 print:hidden"
       >
         <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto w-full">
           <div className="flex items-center gap-2.5">
-            <div
-              className="h-8 w-8 rounded-xl flex items-center justify-center"
-              style={{ background: "var(--ds-primary-container)" }}
-            >
-              <span
-                className="material-symbols-outlined text-white text-base"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                storefront
-              </span>
-            </div>
+            <img src="/invoice_logo.png" alt="Logo" className="w-9 h-9 object-contain" />
             <span
               className="text-ds-primary font-extrabold text-base"
               style={{ fontFamily: "'Manrope', sans-serif" }}
             >
-              Kanto Invoice
+              {import.meta.env.VITE_APP_NAME || "Kanto Invoice"}
             </span>
           </div>
 
@@ -311,6 +328,8 @@ export function Dashboard() {
         )}
         {activeTab === "products" && <ProductManagement mySub={mySub} shop={shop} />}
         {activeTab === "invoice" && <TabDemoInvoice shop={shop} />}
+        {activeTab === "create_invoice" && <TabCreateInvoice shop={shop} />}
+        {activeTab === "history" && <TabInvoiceHistory shop={shop} />}
         {activeTab === "profile" && (
           <TabProfile
             user={user}
@@ -320,13 +339,14 @@ export function Dashboard() {
             onLogout={handleLogout}
             onUserUpdated={(u) => setUser(u)}
             onShopUpdated={(s) => setShop(s)}
+            onGoToBuyPlan={() => navigate("/dashboard/plan")}
           />
         )}
       </main>
 
       {/* ── Bottom Nav ── */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 border-t"
+        className="fixed bottom-0 left-0 right-0 z-40 border-t print:hidden"
         style={{
           background: "rgba(248,250,251,0.97)",
           borderColor: "var(--ds-outline-variant)",
@@ -334,12 +354,12 @@ export function Dashboard() {
         }}
       >
         <div className="max-w-lg mx-auto flex items-stretch h-16">
-          {TABS.map((tab) => {
-            const active = tab.key === activeTab;
+          {(mySub?.status === "active" ? ACTIVE_SUBSCRIPTION_TABS : BASE_TABS).map((tabItem) => {
+            const active = tabItem.key === activeTab;
             return (
               <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                key={tabItem.key}
+                onClick={() => navigate(`/dashboard/${tabItem.key}`)}
                 className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
               >
                 <span
@@ -351,7 +371,7 @@ export function Dashboard() {
                       : "var(--ds-outline)",
                   }}
                 >
-                  {tab.icon}
+                  {tabItem.icon}
                 </span>
                 <span
                   className="text-[10px] font-semibold tracking-wide transition-colors"
@@ -361,7 +381,7 @@ export function Dashboard() {
                       : "var(--ds-outline)",
                   }}
                 >
-                  {tab.label}
+                  {tabItem.label}
                 </span>
                 {active && (
                   <div
@@ -426,7 +446,7 @@ function TabBuyPlan({
       await subscriptionApi.purchase({
         planId: plan._id,
         billingCycleId: selectedCycleId,
-        paymentMethod: "bKash",
+        paymentMethod: "bkash",
         paymentReference: `${mobileNumber} - ${transactionId}`,
       });
       setToast("Upgrade requested successfully. Waiting for admin approval.");
@@ -602,7 +622,7 @@ function TabBuyPlan({
                   <p className="text-ds-on-surface-variant font-medium">• Bank Account: 1444444444</p>
                   <p className="text-ds-on-surface-variant font-medium mt-1">and provide the transaction details below.</p>
                 </div>
-                
+
                 <div className="space-y-3">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-1">Mobile Number</label>
@@ -868,168 +888,23 @@ function TabDemoInvoice({ shop }: { shop: ApiShop | null }) {
       </div>
 
       {/* ── POS Receipt Card ── */}
-      <div
-        className="rounded-2xl border overflow-hidden shadow-sm"
-        style={{
-          background: "var(--ds-surface-container-lowest)",
-          borderColor: "var(--ds-outline-variant)",
-        }}
-      >
-        {/* Receipt header with shop info */}
-        <div
-          className="py-5 px-5 text-center text-white"
-          style={{ background: "var(--ds-primary-container)" }}
-        >
-          <h3
-            className="text-xl font-extrabold"
-            style={{ fontFamily: "'Manrope', sans-serif" }}
-          >
-            {shopName}
-          </h3>
-          <p className="text-xs text-white/70 mt-1 leading-relaxed">{shopAddress}</p>
-          <p className="text-xs text-white/80 font-semibold mt-0.5">{shopPhone}</p>
-        </div>
-
-        {/* POS Invoice label */}
-        <div className="text-center py-2 border-b" style={{ borderColor: "var(--ds-outline-variant)" }}>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ds-outline">
-            ─ ─ ─ &nbsp; POS Invoice &nbsp; ─ ─ ─
-          </p>
-        </div>
-
-        {/* Invoice no + Date */}
-        <div
-          className="flex justify-between px-5 py-3 text-xs border-b"
-          style={{ borderColor: "var(--ds-outline-variant)" }}
-        >
-          <div>
-            <p className="text-ds-outline font-medium">Invoice No.</p>
-            <p className="text-ds-on-surface font-bold mt-0.5">{invNumber}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-ds-outline font-medium">Date</p>
-            <p className="text-ds-on-surface font-bold mt-0.5">{invDate}</p>
-          </div>
-        </div>
-
-        {/* Customer */}
-        <div
-          className="px-5 py-3 border-b"
-          style={{ borderColor: "var(--ds-outline-variant)" }}
-        >
-          <p className="text-ds-outline text-[10px] font-bold uppercase tracking-wider mb-1">
-            Billed To
-          </p>
-          <p className="text-ds-on-surface text-sm font-semibold">Rahim Ahmed</p>
-          <p className="text-ds-outline text-xs">+880 1934-567890</p>
-        </div>
-
-        {/* Items table header */}
-        <div className="px-5 pt-3 pb-1">
-          <div className="flex text-[10px] font-bold uppercase tracking-wider text-ds-outline border-b pb-1.5" style={{ borderColor: "var(--ds-outline-variant)" }}>
-            <span className="flex-1">Item</span>
-            <span className="w-10 text-center">Qty</span>
-            <span className="w-16 text-right">Rate</span>
-            <span className="w-16 text-right">Amount</span>
-          </div>
-        </div>
-
-        {/* Items */}
-        <div className="px-5 py-2 space-y-2">
-          {items.map((item, i) => (
-            <div key={i} className="flex items-start text-xs">
-              <span className="flex-1 text-ds-on-surface font-medium pr-2 leading-snug">
-                {item.name}
-              </span>
-              <span className="w-10 text-center text-ds-outline">{item.qty}</span>
-              <span className="w-16 text-right text-ds-outline">৳{item.price.toLocaleString()}</span>
-              <span className="w-16 text-right text-ds-on-surface font-bold">
-                ৳{(item.qty * item.price).toLocaleString()}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Dashed divider */}
-        <div className="px-5 py-1">
-          <div className="border-t border-dashed" style={{ borderColor: "var(--ds-outline-variant)" }} />
-        </div>
-
-        {/* Totals */}
-        <div className="px-5 py-2 space-y-1.5">
-          <div className="flex justify-between text-xs text-ds-on-surface-variant">
-            <span>Subtotal</span>
-            <span>৳{subtotal.toLocaleString()}</span>
-          </div>
-          {discount > 0 && (
-            <div className="flex justify-between text-xs text-green-600">
-              <span>Discount</span>
-              <span>−৳{discount.toLocaleString()}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Grand total */}
-        <div
-          className="mx-5 mb-4 rounded-xl px-4 py-3 flex justify-between items-center"
-          style={{ background: "var(--ds-surface-container-low)" }}
-        >
-          <span
-            className="font-extrabold text-ds-primary"
-            style={{ fontFamily: "'Manrope', sans-serif" }}
-          >
-            Grand Total
-          </span>
-          <span
-            className="text-xl font-extrabold"
-            style={{
-              color: "var(--ds-primary-container)",
-              fontFamily: "'Manrope', sans-serif",
-            }}
-          >
-            ৳{grandTotal.toLocaleString()}
-          </span>
-        </div>
-
-        {/* Dashed divider */}
-        <div className="px-5">
-          <div className="border-t border-dashed" style={{ borderColor: "var(--ds-outline-variant)" }} />
-        </div>
-
-        {/* Footer — Thank you + Social Links */}
-        <div className="text-center px-5 py-4 space-y-2.5">
-          <p className="text-ds-on-surface text-xs font-semibold">
-            {shop?.receiptConfig?.footerText || "Thank you for your purchase!"}
-          </p>
-
-          {/* Social links */}
-          {(fbLink || igLink) && (
-            <div className="space-y-1.5 pt-1">
-              <div className="border-t border-dashed mx-8 mb-2" style={{ borderColor: "var(--ds-outline-variant)" }} />
-              {fbLink && (
-                <div className="flex items-center justify-center gap-2 text-xs text-ds-on-surface-variant">
-                  <span className="material-symbols-outlined text-sm" style={{ color: "#1877F2" }}>
-                    public
-                  </span>
-                  <span className="truncate max-w-[220px]">{fbLink}</span>
-                </div>
-              )}
-              {igLink && (
-                <div className="flex items-center justify-center gap-2 text-xs text-ds-on-surface-variant">
-                  <span className="material-symbols-outlined text-sm" style={{ color: "#E4405F" }}>
-                    photo_camera
-                  </span>
-                  <span className="truncate max-w-[220px]">{igLink}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          <p className="text-[10px] text-ds-outline/60 mt-1">
-            ✦ Demo receipt — upgrade for real invoicing
-          </p>
-        </div>
-      </div>
+      <InvoiceTemplate
+        shopName={shopName}
+        shopAddress={shopAddress}
+        shopPhone={shopPhone}
+        fbLink={fbLink}
+        igLink={igLink}
+        footerText={shop?.receiptConfig?.footerText || ""}
+        invNumber={invNumber}
+        invDate={invDate}
+        customerName="Rahim Ahmed"
+        customerPhone="+880 1934-567890"
+        items={items}
+        subtotal={subtotal}
+        discount={discount}
+        grandTotal={grandTotal}
+        isDemo={true}
+      />
 
       {/* Print / share */}
       <div className="flex gap-3 mt-4">
@@ -1069,6 +944,7 @@ function TabProfile({
   onLogout,
   onUserUpdated,
   onShopUpdated,
+  onGoToBuyPlan,
 }: {
   user: ApiUser | null;
   shop: ApiShop | null;
@@ -1077,6 +953,7 @@ function TabProfile({
   onLogout: () => void;
   onUserUpdated: (u: ApiUser) => void;
   onShopUpdated: (s: ApiShop) => void;
+  onGoToBuyPlan?: () => void;
 }) {
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -1281,6 +1158,26 @@ function TabProfile({
 
       {/* Settings row */}
       <div className="pt-1 space-y-2">
+        {mySub?.status === "active" && (
+          <button
+            onClick={onGoToBuyPlan}
+            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98] mb-2"
+            style={{
+              background: "rgba(232, 167, 53, 0.08)",
+              borderColor: "var(--ds-on-tertiary-container)",
+            }}
+          >
+            <span className="material-symbols-outlined text-xl text-yellow-600">
+              arrow_upward
+            </span>
+            <span className="text-sm font-medium text-yellow-700 flex-1 text-left">
+              Upgrade Subscription Plan
+            </span>
+            <span className="material-symbols-outlined text-base text-yellow-700">
+              chevron_right
+            </span>
+          </button>
+        )}
         {[
           { icon: "edit", label: "Edit Profile", action: () => setEditProfileOpen(true) },
           { icon: "lock", label: "Change Password", action: () => setChangePasswordOpen(true) },

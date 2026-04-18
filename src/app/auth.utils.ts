@@ -299,6 +299,32 @@ async function authedPost<T>(basePath: string, path: string, body: unknown): Pro
   return data as T;
 }
 
+async function authedDelete<T>(basePath: string, path: string): Promise<T> {
+  const token = getToken();
+  const res = await fetch(`${basePath}${path}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    if (Array.isArray(data.errors)) {
+      const msg = (data.errors as { path: string; message: string }[])
+        .map((e) => e.message)
+        .join(", ");
+      throw new Error(msg);
+    }
+    throw new Error(data.message ?? "Something went wrong");
+  }
+
+  return data as T;
+}
+
 export async function authedFormDataPost<T>(basePath: string, path: string, formData: FormData): Promise<T> {
   const token = getToken();
   const res = await fetch(`${basePath}${path}`, {
@@ -539,6 +565,7 @@ export interface SubStats {
 export interface PopulatedSubscription {
   _id: string;
   userId: { _id: string; name: string; email: string; phone: string; image: string } | null;
+  shopName?: string;
   planId: { _id: string; name: string; price: number; billingCycle: string } | null;
   status: "pending" | "active" | "expired" | "cancelled";
   paymentMethod: string;
@@ -735,5 +762,68 @@ export const billingCycleApi = {
       BILLING_CYCLE_BASE,
       `/active-inactive/${id}`,
       { isActive }
+    ),
+};
+
+// ─── Invoice API ──────────────────────────────────────────────────────────
+
+const INVOICE_BASE = `${API_BASE}/invoice`;
+
+export interface ApiInvoiceItem {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface ApiInvoice {
+  _id: string;
+  shopId: string;
+  invoiceNumber: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  customerAddress: string;
+  items: ApiInvoiceItem[];
+  subtotal: number;
+  discountType: "flat" | "percentage";
+  discount: number;
+  discountAmount: number;
+  tax: number;
+  grandTotal: number;
+  notes: string;
+  status: "draft" | "issued" | "paid" | "void" | "printed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const invoiceApi = {
+  createInvoice: (shopId: string, payload: {
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+    customerAddress?: string;
+    items: { name: string; quantity: number; unitPrice: number }[];
+    discountType?: "flat" | "percentage";
+    discount?: number;
+    tax?: number;
+    notes?: string;
+    status?: string;
+  }) =>
+    authedPost<{ success: boolean; invoice: ApiInvoice; message: string }>(
+      INVOICE_BASE,
+      `/shop/${shopId}`,
+      payload
+    ),
+
+  listInvoices: (shopId: string, page = 1, limit = 20) =>
+    authedGet<{ success: boolean; invoices: ApiInvoice[]; total: number }>(
+      `${INVOICE_BASE}/shop/${shopId}?page=${page}&limit=${limit}`
+    ),
+
+  deleteInvoice: (shopId: string, invoiceId: string) =>
+    authedDelete<{ success: boolean; message: string }>(
+      INVOICE_BASE,
+      `/shop/${shopId}/${invoiceId}`,
     ),
 };

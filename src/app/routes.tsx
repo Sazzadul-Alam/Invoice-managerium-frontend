@@ -43,6 +43,10 @@ export const router = createBrowserRouter([
     Component: Dashboard,
   },
   {
+    path: "/dashboard/:tab",
+    Component: Dashboard,
+  },
+  {
     path: "/admin/dashboard",
     Component: AdminDashboard,
   },
