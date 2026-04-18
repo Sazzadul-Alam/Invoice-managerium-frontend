@@ -790,6 +790,7 @@ export interface ApiInvoice {
   discount: number;
   discountAmount: number;
   tax: number;
+  advanceAmount: number;
   grandTotal: number;
   notes: string;
   status: "draft" | "issued" | "paid" | "void" | "printed";
@@ -807,6 +808,7 @@ export const invoiceApi = {
     discountType?: "flat" | "percentage";
     discount?: number;
     tax?: number;
+    advanceAmount?: number;
     notes?: string;
     status?: string;
   }) =>
