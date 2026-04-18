@@ -168,6 +168,7 @@ export function TabInvoiceHistory({ shop }: { shop: ApiShop | null }) {
                   items={previewInvoice.items.map(c => ({ name: c.name, qty: c.quantity, price: c.unitPrice }))}
                   subtotal={previewInvoice.subtotal}
                   discount={previewInvoice.discountAmount}
+                  advanceAmount={previewInvoice.advanceAmount}
                   grandTotal={previewInvoice.grandTotal}
                   notes={previewInvoice.notes}
                />
@@ -213,6 +214,7 @@ export function TabInvoiceHistory({ shop }: { shop: ApiShop | null }) {
                 items={previewInvoice.items.map(c => ({ name: c.name, qty: c.quantity, price: c.unitPrice }))}
                 subtotal={previewInvoice.subtotal}
                 discount={previewInvoice.discountAmount}
+                advanceAmount={previewInvoice.advanceAmount}
                 grandTotal={previewInvoice.grandTotal}
                 notes={previewInvoice.notes}
              />
