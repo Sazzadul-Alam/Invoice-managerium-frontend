@@ -166,15 +166,15 @@ export function AdminDashboard() {
           <div><span style={{ opacity: .6 }}>Amount:</span> <b style={{ color: "var(--ds-on-surface)" }}>৳{fmt(s.paymentAmount)}</b></div>
           <div><span style={{ opacity: .6 }}>Method:</span> {s.paymentMethod}</div>
           <div style={{ gridColumn: "1/-1" }}>
-            <span style={{ opacity: .6 }}>Ref:</span> 
+            <span style={{ opacity: .6 }}>Ref:</span>
             {s.paymentReference && s.paymentReference.includes(" - ") ? (
               <span style={{ color: "var(--ds-on-surface)", marginLeft: 4 }}>
-               No: <b style={{ background: "var(--ds-surface-container-high)", padding: "2px 6px", borderRadius: 4 }}>{s.paymentReference.split(" - ")[0]}</b>
-               <span style={{ margin: "0 6px", opacity: 0.5 }}>|</span> 
-               TrxID: <b style={{ background: "var(--ds-surface-container-high)", padding: "2px 6px", borderRadius: 4 }}>{s.paymentReference.split(" - ")[1]}</b>
+                No: <b style={{ background: "var(--ds-surface-container-high)", padding: "2px 6px", borderRadius: 4 }}>{s.paymentReference.split(" - ")[0]}</b>
+                <span style={{ margin: "0 6px", opacity: 0.5 }}>|</span>
+                TrxID: <b style={{ background: "var(--ds-surface-container-high)", padding: "2px 6px", borderRadius: 4 }}>{s.paymentReference.split(" - ")[1]}</b>
               </span>
             ) : (
-               <span style={{ marginLeft: 4 }}>{s.paymentReference || "—"}</span>
+              <span style={{ marginLeft: 4 }}>{s.paymentReference || "—"}</span>
             )}
           </div>
           <div style={{ gridColumn: "1/-1", marginTop: 4 }}><span style={{ opacity: .6 }}>Submitted:</span> {ago(s.createdAt)}</div>
@@ -288,7 +288,7 @@ export function AdminDashboard() {
 
   const PlansTab = () => {
     const [subTab, setSubTab] = useState<"plans" | "cycles">("plans");
-    
+
     // --- Plans State ---
     const [plans, setPlans] = useState<ApiPlan[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(true);
@@ -326,8 +326,8 @@ export function AdminDashboard() {
       setLoadingCycles(false);
     }, []);
 
-    useEffect(() => { 
-      if (subTab === "plans") loadPlans(); 
+    useEffect(() => {
+      if (subTab === "plans") loadPlans();
       else loadCycles();
     }, [loadPlans, loadCycles, subTab]);
 
@@ -337,7 +337,7 @@ export function AdminDashboard() {
         // Auto-generate slug from name
         const slug = formData.name?.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
         const payload = { ...formData, slug };
-        
+
         const r = await adminApi.createPlan(payload);
         setToast(r.message);
         setTimeout(() => setToast(""), 2600);
@@ -397,14 +397,14 @@ export function AdminDashboard() {
             borderBottom: subTab === "plans" ? "3px solid var(--ds-primary)" : "3px solid transparent",
             fontFamily: "var(--font-headline)"
           }}>Pricing Plans</button>
-          
-          <button onClick={() => setSubTab("cycles")} style={{
+
+          {/* <button onClick={() => setSubTab("cycles")} style={{
             background: "none", border: "none", padding: "8px 0", cursor: "pointer",
             fontWeight: subTab === "cycles" ? 800 : 600, fontSize: 16,
             color: subTab === "cycles" ? "var(--ds-primary)" : "var(--ds-on-surface-variant)",
             borderBottom: subTab === "cycles" ? "3px solid var(--ds-primary)" : "3px solid transparent",
             fontFamily: "var(--font-headline)"
-          }}>Billing Cycles</button>
+          }}>Billing Cycles</button> */}
         </div>
 
         {subTab === "plans" && (
@@ -413,127 +413,127 @@ export function AdminDashboard() {
               <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)", margin: 0 }}>
                 Subscription Plans
               </h1>
-          <button onClick={() => setShowAdd(!showAdd)} style={{
-            background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
-            border: "none", padding: "6px 12px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-            display: "flex", alignItems: "center", gap: 4, cursor: "pointer"
-          }}>
-            <Icon name={showAdd ? "close" : "add"} style={{ fontSize: 18 }} /> {showAdd ? "Cancel" : "Add Plan"}
-          </button>
-        </div>
-
-        {showAdd && (
-          <div style={{
-            background: "var(--ds-surface-container-lowest)", border: "1px solid var(--ds-outline-variant)",
-            borderRadius: 16, padding: 16, marginBottom: 20
-          }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>Create New Plan</h2>
-
-            <form onSubmit={handleCreate} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Name</label>
-                  <input required autoComplete="off" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Price</label>
-                  <input required autoComplete="off" type="number" value={formData.price ?? ""} onChange={e => setFormData({ ...formData, price: e.target.value === "" ? undefined : Number(e.target.value) })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Description</label>
-                <input required autoComplete="off" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Shops</label>
-                  <input required autoComplete="off" type="number" value={formData.maxShops ?? ""} onChange={e => setFormData({ ...formData, maxShops: e.target.value === "" ? undefined : Number(e.target.value) })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Products/Shop</label>
-                  <input required autoComplete="off" type="number" value={formData.maxProductsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxProductsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Moderators/Shop</label>
-                  <input required autoComplete="off" type="number" value={formData.maxModeratorsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxModeratorsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Invoices/Month</label>
-                  <input required autoComplete="off" type="number" value={formData.maxInvoicesPerMonth ?? ""} onChange={e => setFormData({ ...formData, maxInvoicesPerMonth: e.target.value === "" ? undefined : Number(e.target.value) })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                </div>
-              </div>
-              <button type="submit" style={{
-                background: "var(--ds-primary)", color: "white", padding: "10px", borderRadius: 8,
-                border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 8
+              <button onClick={() => setShowAdd(!showAdd)} style={{
+                background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
+                border: "none", padding: "6px 12px", borderRadius: 12, fontSize: 13, fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 4, cursor: "pointer"
               }}>
-                Save Plan
+                <Icon name={showAdd ? "close" : "add"} style={{ fontSize: 18 }} /> {showAdd ? "Cancel" : "Add Plan"}
               </button>
-            </form>
-          </div>
-        )}
+            </div>
 
-        {loadingPlans ? (
-          <div style={{ textAlign: "center", padding: 40, color: "var(--ds-on-surface-variant)" }}>Loading plans…</div>
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {plans.map(p => (
-              <div key={p._id} style={{
+            {showAdd && (
+              <div style={{
                 background: "var(--ds-surface-container-lowest)", border: "1px solid var(--ds-outline-variant)",
-                borderRadius: 16, padding: 16
+                borderRadius: 16, padding: 16, marginBottom: 20
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--ds-primary)" }}>{p.name}</h3>
-                      <span style={{
-                        padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                        background: p.isActive ? "#e8f5e9" : "#ffebee", color: p.isActive ? "#2e7d32" : "#c62828"
-                      }}>
-                        {p.isActive ? "Active" : "Inactive"}
-                      </span>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>Create New Plan</h2>
+
+                <form onSubmit={handleCreate} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Name</label>
+                      <input required autoComplete="off" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
                     </div>
-                    <span style={{ fontSize: 11, color: "var(--ds-on-surface-variant)", background: "var(--ds-surface-container-high)", padding: "2px 8px", borderRadius: 10 }}>{p.slug}</span>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 16, fontWeight: 800 }}>৳{fmt(p.price)} /mo Base</div>
-                  </div>
-                </div>
-                <p style={{ fontSize: 12, margin: "0 0 12px", color: "var(--ds-on-surface-variant)" }}>{p.description}</p>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                  <div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11 }}>
-                      <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Shops: {p.maxShops === -1 ? "∞" : p.maxShops}</span>
-                      <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Products: {p.maxProductsPerShop === -1 ? "∞" : p.maxProductsPerShop}</span>
-                      <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Invoices: {p.maxInvoicesPerMonth === -1 ? "∞" : p.maxInvoicesPerMonth}</span>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Price</label>
+                      <input required autoComplete="off" type="number" value={formData.price ?? ""} onChange={e => setFormData({ ...formData, price: e.target.value === "" ? undefined : Number(e.target.value) })}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
                     </div>
-                    {!p.isActive && p.deactivatedAt && (
-                      <div style={{ fontSize: 10, color: "var(--ds-on-surface-variant)", marginTop: 6 }}>
-                        Deactivated on: {new Date(p.deactivatedAt).toLocaleDateString()} {new Date(p.deactivatedAt).toLocaleTimeString()}
-                      </div>
-                    )}
                   </div>
-                  <button onClick={() => togglePlanStatus(p._id, !p.isActive)} style={{
-                    background: p.isActive ? "transparent" : "var(--ds-primary-container)",
-                    color: p.isActive ? "var(--ds-on-surface-variant)" : "var(--ds-on-primary)",
-                    padding: "6px 12px", borderRadius: 10, border: p.isActive ? "1px solid var(--ds-outline-variant)" : "none",
-                    cursor: "pointer", fontSize: 12, fontWeight: 600
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Description</label>
+                    <input required autoComplete="off" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
+                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                  </div>
+                  {/* <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Shops</label>
+                      <input required autoComplete="off" type="number" value={formData.maxShops ?? ""} onChange={e => setFormData({ ...formData, maxShops: e.target.value === "" ? undefined : Number(e.target.value) })}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Products/Shop</label>
+                      <input required autoComplete="off" type="number" value={formData.maxProductsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxProductsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Moderators/Shop</label>
+                      <input required autoComplete="off" type="number" value={formData.maxModeratorsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxModeratorsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Invoices/Month</label>
+                      <input required autoComplete="off" type="number" value={formData.maxInvoicesPerMonth ?? ""} onChange={e => setFormData({ ...formData, maxInvoicesPerMonth: e.target.value === "" ? undefined : Number(e.target.value) })}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                    </div>
+                  </div> */}
+                  <button type="submit" style={{
+                    background: "var(--ds-primary)", color: "white", padding: "10px", borderRadius: 8,
+                    border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 8
                   }}>
-                    {p.isActive ? "Deactivate" : "Activate"}
+                    Save Plan
                   </button>
-                </div>
+                </form>
               </div>
-            ))}
+            )}
+
+            {loadingPlans ? (
+              <div style={{ textAlign: "center", padding: 40, color: "var(--ds-on-surface-variant)" }}>Loading plans…</div>
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                {plans.map(p => (
+                  <div key={p._id} style={{
+                    background: "var(--ds-surface-container-lowest)", border: "1px solid var(--ds-outline-variant)",
+                    borderRadius: 16, padding: 16
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--ds-primary)" }}>{p.name}</h3>
+                          <span style={{
+                            padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                            background: p.isActive ? "#e8f5e9" : "#ffebee", color: p.isActive ? "#2e7d32" : "#c62828"
+                          }}>
+                            {p.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 11, color: "var(--ds-on-surface-variant)", background: "var(--ds-surface-container-high)", padding: "2px 8px", borderRadius: 10 }}>{p.slug}</span>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 16, fontWeight: 800 }}>৳{fmt(p.price)} /mo Base</div>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: 12, margin: "0 0 12px", color: "var(--ds-on-surface-variant)" }}>{p.description}</p>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                      <div>
+                        {/* <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11 }}>
+                          <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Shops: {p.maxShops === -1 ? "∞" : p.maxShops}</span>
+                          <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Products: {p.maxProductsPerShop === -1 ? "∞" : p.maxProductsPerShop}</span>
+                          <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Invoices: {p.maxInvoicesPerMonth === -1 ? "∞" : p.maxInvoicesPerMonth}</span>
+                        </div> */}
+                        {!p.isActive && p.deactivatedAt && (
+                          <div style={{ fontSize: 10, color: "var(--ds-on-surface-variant)", marginTop: 6 }}>
+                            Deactivated on: {new Date(p.deactivatedAt).toLocaleDateString()} {new Date(p.deactivatedAt).toLocaleTimeString()}
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => togglePlanStatus(p._id, !p.isActive)} style={{
+                        background: p.isActive ? "transparent" : "var(--ds-primary-container)",
+                        color: p.isActive ? "var(--ds-on-surface-variant)" : "var(--ds-on-primary)",
+                        padding: "6px 12px", borderRadius: 10, border: p.isActive ? "1px solid var(--ds-outline-variant)" : "none",
+                        cursor: "pointer", fontSize: 12, fontWeight: 600
+                      }}>
+                        {p.isActive ? "Deactivate" : "Activate"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </div>
-    )}
 
         {subTab === "cycles" && (
           <div>

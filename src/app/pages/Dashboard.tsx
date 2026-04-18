@@ -508,7 +508,7 @@ function TabBuyPlan({
       {plans.length === 0 && (
         <p className="text-sm text-ds-outline text-center py-8">No plans available.</p>
       )}
-
+      {/* 
       {plans.length > 0 && cycles.length > 0 && (
         <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
           {cycles.map(cycle => (
@@ -526,7 +526,7 @@ function TabBuyPlan({
             </button>
           ))}
         </div>
-      )}
+      )} */}
 
       {plans.map((plan) => {
         const isCurrent = plan.slug === currentPlanSlug;
@@ -1067,7 +1067,7 @@ function TabProfile({
       </div>
 
       {/* Email verification notice */}
-      {user && !user.isVerified && (
+      {/* {user && !user.isVerified && (
         <div
           className="rounded-xl px-4 py-3.5 flex items-center gap-3 border"
           style={{
@@ -1101,7 +1101,7 @@ function TabProfile({
             {verifyLoading ? "Sending…" : "Verify"}
           </button>
         </div>
-      )}
+      )} */}
 
       {/* Info tiles */}
       {[
