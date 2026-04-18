@@ -7,9 +7,8 @@ import {
   ApiShop,
 } from "../auth.utils";
 
-const API_IMAGE_URL = import.meta.env.VITE_API_BASE_URL
-  ? import.meta.env.VITE_API_BASE_URL.replace("/api", "") + "/image/"
-  : "https://api.memobook.shop/image/";
+const API_IMAGE_URL = (import.meta.env.VITE_API_BASE_URL || "https://api.memobook.shop/api")
+  .replace(/\/api\/?$/, "") + "/image/";
 
 export function ProductManagement({
   mySub,
@@ -45,7 +44,7 @@ export function ProductManagement({
   const fetchPrimaryData = async () => {
     try {
       const isFreePlan = planName.toLowerCase() === "free";
-      
+
       const [prodRes, demoRes, varRes] = await Promise.all([
         shop?._id ? productApi.getAll(false, shop._id) : Promise.resolve({ success: true, products: [], total: 0 }),
         isFreePlan ? productApi.getAll(true) : Promise.resolve({ success: true, products: [], total: 0 }),
@@ -227,10 +226,10 @@ export function ProductManagement({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-ds-on-surface truncate">{product.name}</p>
                   <p className="text-xs text-ds-outline mt-0.5">
-                    {product.varient && product.varient.length > 0 
-                      ? `${product.varient[0].name}: ${product.varient[0].value}` 
-                      : typeof product.varientId === "object" && product.varientId 
-                        ? `${product.varientId.name}: ${product.varientId.value}` 
+                    {product.varient && product.varient.length > 0
+                      ? `${product.varient[0].name}: ${product.varient[0].value}`
+                      : typeof product.varientId === "object" && product.varientId
+                        ? `${product.varientId.name}: ${product.varientId.value}`
                         : "No Variant"}
                   </p>
                   <div className="flex items-center gap-3 mt-1.5">
@@ -248,42 +247,42 @@ export function ProductManagement({
                   </div>
                 </div>
 
-                  <div className="flex flex-col items-end gap-2">
-                    {product.isDemo ? (
-                      <span
-                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                        style={{ background: "#e0f2f1", color: "#00796b" }}
+                <div className="flex flex-col items-end gap-2">
+                  {product.isDemo ? (
+                    <span
+                      className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                      style={{ background: "#e0f2f1", color: "#00796b" }}
+                    >
+                      DEMO
+                    </span>
+                  ) : (
+                    <span
+                      className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                      style={{
+                        background: product.status === "active" ? "rgba(0,92,114,0.1)" : "var(--ds-surface-container-high)",
+                        color: product.status === "active" ? "var(--ds-primary-container)" : "var(--ds-outline)",
+                      }}
+                    >
+                      {product.status}
+                    </span>
+                  )}
+                  {!product.isDemo && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEdit(product)}
+                        className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
                       >
-                        DEMO
-                      </span>
-                    ) : (
-                      <span
-                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                        style={{
-                          background: product.status === "active" ? "rgba(0,92,114,0.1)" : "var(--ds-surface-container-high)",
-                          color: product.status === "active" ? "var(--ds-primary-container)" : "var(--ds-outline)",
-                        }}
+                        <span className="material-symbols-outlined text-base">edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product._id)}
+                        className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
                       >
-                        {product.status}
-                      </span>
-                    )}
-                    {!product.isDemo && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleOpenEdit(product)}
-                          className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-base">edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(product._id)}
-                          className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-base">delete</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                        <span className="material-symbols-outlined text-base">delete</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ))
           )}
