@@ -299,6 +299,33 @@ async function authedPost<T>(basePath: string, path: string, body: unknown): Pro
   return data as T;
 }
 
+async function authedPatch<T>(url: string, body: unknown): Promise<T> {
+  const token = getToken();
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    if (Array.isArray(data.errors)) {
+      const msg = (data.errors as { path: string; message: string }[])
+        .map((e) => e.message)
+        .join(", ");
+      throw new Error(msg);
+    }
+    throw new Error(data.message ?? "Something went wrong");
+  }
+
+  return data as T;
+}
+
 async function authedDelete<T>(basePath: string, path: string): Promise<T> {
   const token = getToken();
   const res = await fetch(`${basePath}${path}`, {
@@ -791,6 +818,8 @@ export interface ApiInvoice {
   discountAmount: number;
   tax: number;
   advanceAmount: number;
+  deliveryCharge: number;
+  isDeliveryPaid: boolean;
   grandTotal: number;
   notes: string;
   status: "draft" | "issued" | "paid" | "void" | "printed";
@@ -809,13 +838,42 @@ export const invoiceApi = {
     discount?: number;
     tax?: number;
     advanceAmount?: number;
+    deliveryCharge?: number;
+    isDeliveryPaid?: boolean;
     notes?: string;
     status?: string;
+    date?: string;
   }) =>
     authedPost<{ success: boolean; invoice: ApiInvoice; message: string }>(
       INVOICE_BASE,
       `/shop/${shopId}`,
       payload
+    ),
+  updateInvoice: (shopId: string, invoiceId: string, payload: Partial<{
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string;
+    customerAddress: string;
+    items: { name: string; quantity: number; unitPrice: number }[];
+    discountType: "flat" | "percentage";
+    discount: number;
+    tax: number;
+    advanceAmount: number;
+    deliveryCharge: number;
+    isDeliveryPaid: boolean;
+    notes: string;
+    status: string;
+    date: string;
+  }>) =>
+    authedPut<{ success: boolean; invoice: ApiInvoice; message: string }>(
+      INVOICE_BASE,
+      `/shop/${shopId}/${invoiceId}`,
+      payload
+    ),
+  updateStatus: (shopId: string, invoiceId: string, status: string) =>
+    authedPatch<{ success: boolean; invoice: ApiInvoice; message: string }>(
+      `${INVOICE_BASE}/shop/${shopId}/${invoiceId}`,
+      { status }
     ),
 
   listInvoices: (shopId: string, page = 1, limit = 20) =>

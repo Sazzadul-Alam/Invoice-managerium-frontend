@@ -15,7 +15,15 @@ function formatAddress(addr: ApiShop["address"]): string {
   return parts.join(", ");
 }
 
-export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
+export function TabCreateInvoice({ 
+  shop, 
+  editInvoice, 
+  onCancelEdit 
+}: { 
+  shop: ApiShop | null; 
+  editInvoice?: any;
+  onCancelEdit?: () => void;
+}) {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -24,11 +32,14 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const [cart, setCart] = useState<{ product: ApiProduct; quantity: number }[]>([]);
+  const [cart, setCart] = useState<{ cartItemId: string; product: ApiProduct; quantity: number; variety?: string }[]>([]);
   const [discountType, setDiscountType] = useState<"flat" | "percentage">("flat");
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [advanceAmount, setAdvanceAmount] = useState<number>(0);
+  const [deliveryCharge, setDeliveryCharge] = useState<number>(0);
+  const [isDeliveryPaid, setIsDeliveryPaid] = useState(false);
   const [notes, setNotes] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -47,6 +58,34 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
     }
   }, [shop]);
 
+  useEffect(() => {
+    if (editInvoice) {
+      setCustomerName(editInvoice.customerName || "");
+      setCustomerPhone(editInvoice.customerPhone || "");
+      setCustomerEmail(editInvoice.customerEmail || "");
+      setCustomerAddress(editInvoice.customerAddress || "");
+      setInvoiceDate(new Date(editInvoice.createdAt).toISOString().split('T')[0]);
+      setDiscountType(editInvoice.discountType || "flat");
+      setDiscountValue(editInvoice.discount || 0);
+      setAdvanceAmount(editInvoice.advanceAmount || 0);
+      setDeliveryCharge(editInvoice.deliveryCharge || 0);
+      setIsDeliveryPaid(editInvoice.isDeliveryPaid || false);
+      setNotes(editInvoice.notes || "");
+      
+      const newCart = editInvoice.items.map((it: any) => {
+        // Try to find matching product or create dummy
+        const found = products.find(p => p.name === it.name.split(' (')[0]);
+        return {
+          cartItemId: Math.random().toString(36).substring(2, 9),
+          product: found || { _id: 'manual', name: it.name, price: it.unitPrice } as ApiProduct,
+          quantity: it.quantity,
+          variety: it.name.includes('(') ? it.name.match(/\(([^)]+)\)/)?.[1] : undefined
+        };
+      });
+      setCart(newCart);
+    }
+  }, [editInvoice, products]);
+
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -60,31 +99,34 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
   }, [products, searchQuery]);
 
   const addToCart = (product: ApiProduct) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.product._id === product._id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product._id === product._id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prev, { product, quantity: 1 }];
-    });
+    setCart((prev) => [
+      ...prev,
+      { cartItemId: Math.random().toString(36).substring(2, 9), product, quantity: 1, variety: "M" }
+    ]);
     setSearchQuery("");
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateVariety = (cartItemId: string, variety: string) => {
+    setCart((prev) =>
+      prev.map((item) => (item.cartItemId === cartItemId ? { ...item, variety } : item))
+    );
+  };
+
+  const updateQuantity = (cartItemId: string, quantity: number) => {
     if (quantity <= 0) {
-      setCart((prev) => prev.filter((item) => item.product._id !== productId));
+      setCart((prev) => prev.filter((item) => item.cartItemId !== cartItemId));
     } else {
       setCart((prev) =>
-        prev.map((item) => (item.product._id === productId ? { ...item, quantity } : item))
+        prev.map((item) => (item.cartItemId === cartItemId ? { ...item, quantity } : item))
       );
     }
   };
 
   const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
   const discountAmount = discountType === "percentage" ? (subtotal * discountValue) / 100 : discountValue;
-  const grandTotal = Math.max(0, subtotal - discountAmount - advanceAmount);
+  // Only add delivery charge to grand total if it's NOT paid yet
+  const effectiveDeliveryCharge = isDeliveryPaid ? 0 : deliveryCharge;
+  const grandTotal = Math.max(0, subtotal - discountAmount + effectiveDeliveryCharge - advanceAmount);
 
   const handleCreate = async (triggerPrint = false) => {
     if (!shop) return;
@@ -100,6 +142,9 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
         if (typeof c.product.varientId === 'object' && c.product.varientId) {
           name += ` • ${c.product.varientId.name}: ${c.product.varientId.value}`;
         }
+        if (c.variety) {
+          name += ` (${c.variety})`;
+        }
         return {
           name,
           quantity: c.quantity,
@@ -107,13 +152,20 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
         };
       });
       
-      await invoiceApi.createInvoice(shop._id, {
+      const payload = {
         customerName, customerPhone, customerEmail, customerAddress, 
-        items, discountType, discount: discountValue, advanceAmount, notes,
-        status: triggerPrint ? "printed" : "issued"
-      });
+        items, discountType, discount: discountValue, advanceAmount, deliveryCharge, isDeliveryPaid, notes,
+        status: triggerPrint ? "printed" : "issued",
+        date: invoiceDate ? new Date(invoiceDate).toISOString() : undefined,
+      };
 
-      showToast("Invoice created successfully!", "success");
+      if (editInvoice) {
+        await invoiceApi.updateInvoice(shop._id, editInvoice._id, payload);
+        showToast("Invoice updated successfully!", "success");
+      } else {
+        await invoiceApi.createInvoice(shop._id, payload);
+        showToast("Invoice created successfully!", "success");
+      }
       success = true;
     } catch (err: any) {
       showToast(err.message || "Failed to create invoice", "error");
@@ -125,10 +177,12 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
             window.print();
               setTimeout(() => {
                 setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
+                if (onCancelEdit) onCancelEdit();
               }, 1000);
           }, 300);
         } else {
           setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
+          if (onCancelEdit) onCancelEdit();
         }
       }
     }
@@ -156,33 +210,57 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
       )}
 
       {/* Header */}
-      <div>
-        <h2 className="text-lg font-extrabold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>
-          Create Invoice
-        </h2>
-        <p className="text-xs text-ds-outline">Draft a new invoice for your customer</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-extrabold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>
+            {editInvoice ? "Edit Invoice" : "Create Invoice"}
+          </h2>
+          <p className="text-xs text-ds-outline">
+            {editInvoice ? `Modifying #${editInvoice.invoiceNumber}` : "Draft a new invoice for your customer"}
+          </p>
+        </div>
+        {editInvoice && onCancelEdit && (
+          <button 
+            onClick={onCancelEdit}
+            className="px-3 py-1.5 rounded-lg border border-ds-outline text-ds-outline text-[10px] font-bold uppercase tracking-wider active:scale-95 transition-all"
+          >
+            Cancel
+          </button>
+        )}
       </div>
 
-      {/* Customer Area */}
+      {/* Customer & Invoice Area */}
       <div className="space-y-4 rounded-xl border p-4 bg-ds-surface-container-lowest" style={{ borderColor: 'var(--ds-outline-variant)' }}>
-        <h3 className="text-sm font-bold text-ds-primary tracking-wide mb-2 uppercase">Customer Info</h3>
+        <div className="flex items-center justify-between mb-2">
+           <h3 className="text-sm font-bold text-ds-primary tracking-wide uppercase">Details</h3>
+           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-ds-surface-container-low border border-ds-outline-variant">
+             <span className="material-symbols-outlined text-[16px] text-ds-outline">calendar_today</span>
+             <input 
+               type="date" 
+               value={invoiceDate} 
+               onChange={e => setInvoiceDate(e.target.value)} 
+               className="text-xs font-bold bg-transparent outline-none text-ds-on-surface"
+             />
+           </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
            <div className="col-span-2 sm:col-span-1">
-             <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Name</label>
+             <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Name</label>
              <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="e.g. John Doe" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
            </div>
            <div className="col-span-2 sm:col-span-1">
-             <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Phone</label>
-             <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="01XXX-XXXXXX" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
-           </div>
-           <div className="col-span-2">
-             <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Email (Optional)</label>
-             <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="john@example.com" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
-           </div>
-           <div className="col-span-2">
-             <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Address (Optional)</label>
-             <input type="text" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder="123 Main St, Dhaka" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
-           </div>
+              <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Phone</label>
+              <input type="text" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="01XXX-XXXXXX" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Email (Optional)</label>
+              <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="example@mail.com" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Address</label>
+              <input type="text" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder="e.g. 123 Street, Dhaka" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
+            </div>
         </div>
       </div>
 
@@ -230,7 +308,7 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
         {cart.length > 0 && (
           <div className="space-y-2 mt-4 max-h-64 overflow-y-auto pr-1">
             {cart.map(item => (
-              <div key={item.product._id} className="flex justify-between items-center p-3 border border-ds-outline-variant rounded-xl bg-ds-surface-container-low">
+              <div key={item.cartItemId} className="flex justify-between items-center p-3 border border-ds-outline-variant rounded-xl bg-ds-surface-container-low">
                 <div className="flex-1 min-w-0 pr-2">
                   <p className="text-xs font-semibold truncate text-ds-on-surface">
                     {item.product.name}
@@ -241,9 +319,35 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
                   <p className="text-[10px] text-ds-outline">৳{item.product.price} each</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => updateQuantity(item.product._id, item.quantity - 1)} className="p-1 rounded bg-ds-outline/10"><span className="material-symbols-outlined text-[14px]">remove</span></button>
-                  <span className="text-xs font-bold w-4 text-center">{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.product._id, item.quantity + 1)} className="p-1 rounded bg-ds-outline/10"><span className="material-symbols-outlined text-[14px]">add</span></button>
+                  <div className="relative group">
+                    <select 
+                      value={item.variety || "M"} 
+                      onChange={(e) => updateVariety(item.cartItemId, e.target.value)}
+                      className="appearance-none text-[10px] font-black bg-ds-primary/5 text-ds-primary border border-ds-primary/20 rounded-lg pl-2 pr-5 py-1.5 outline-none focus:ring-1 focus:ring-ds-primary/30 transition-all cursor-pointer"
+                    >
+                      <option value="M">M</option>
+                      <option value="L">L</option>
+                      <option value="XL">XL</option>
+                      <option value="XXL">XXL</option>
+                    </select>
+                    <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[12px] pointer-events-none text-ds-primary">expand_more</span>
+                  </div>
+                  
+                  <div className="flex items-center bg-ds-surface-container-lowest border border-ds-outline-variant rounded-lg p-0.5 shadow-sm">
+                    <button 
+                      onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)} 
+                      className="p-1 rounded-md hover:bg-ds-surface-container-high text-ds-outline active:scale-90 transition-transform"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">remove</span>
+                    </button>
+                    <span className="text-[11px] font-bold w-6 text-center text-ds-on-surface">{item.quantity}</span>
+                    <button 
+                      onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)} 
+                      className="p-1 rounded-md hover:bg-ds-surface-container-high text-ds-primary active:scale-90 transition-transform"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">add</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -296,10 +400,51 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
            />
         </div>
 
-        <div className="border-t border-ds-outline-variant pt-3 flex items-center justify-between">
-           <span className="text-sm font-bold uppercase text-ds-primary tracking-widest">Grand Total</span>
-           <span className="text-lg font-extrabold text-ds-primary">৳{grandTotal.toFixed(2)}</span>
-        </div>
+        <div className="flex items-center justify-between">
+           <span className="text-sm font-semibold text-ds-on-surface-variant">Delivery Charge</span>
+            {isDeliveryPaid ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-ds-outline line-through opacity-50">৳{deliveryCharge}</span>
+                <span className="px-2 py-0.5 rounded-md bg-green-500 text-white text-[10px] font-black uppercase tracking-wider shadow-sm">PAID</span>
+              </div>
+            ) : (
+              <input
+                type="number"
+                min="0"
+                value={deliveryCharge || ""}
+                onChange={(e) => setDeliveryCharge(Number(e.target.value))}
+                placeholder="0"
+                className="w-24 text-right border border-ds-outline-variant rounded-lg text-sm px-2 py-1 outline-none bg-ds-surface-container-low"
+              />
+            )}
+         </div>
+
+         <div className="flex items-center justify-between py-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="deliveryPaid"
+                checked={isDeliveryPaid}
+                onChange={(e) => setIsDeliveryPaid(e.target.checked)}
+                className="w-4 h-4 rounded border-ds-outline-variant text-ds-primary focus:ring-ds-primary cursor-pointer"
+              />
+              <label htmlFor="deliveryPaid" className="text-sm font-semibold text-ds-on-surface-variant cursor-pointer select-none">
+                Delivery Charge Paid
+              </label>
+            </div>
+            {isDeliveryPaid && (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 uppercase tracking-wider animate-in fade-in slide-in-from-right-2 duration-300">
+                <span className="material-symbols-outlined text-[14px]">payments</span>
+                Delivery Paid
+              </span>
+            )}
+         </div>
+
+         <div className="border-t border-ds-outline-variant pt-4 flex items-center justify-between">
+            <span className="text-sm font-black text-ds-on-surface uppercase tracking-tight">Total Amount</span>
+            <span className="text-xl font-black text-ds-primary">৳{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+         </div>
+
 
         <div className="pt-2">
           <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Notes (Optional)</label>
@@ -325,7 +470,7 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
            disabled={saving}
            className="flex-[1.5] py-3.5 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center"
         >
-           {saving ? "Saving..." : "Save"}
+           {saving ? "Saving..." : (editInvoice ? "Update" : "Save")}
         </button>
         <button 
            onClick={() => handleCreate(true)}
@@ -334,7 +479,7 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
            style={{ background: "var(--ds-primary)" }}
         >
           {saving ? <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <span className="material-symbols-outlined text-lg">print</span>}
-          {saving ? "Saving..." : "Print"}
+          {saving ? "Saving..." : (editInvoice ? "Update & Print" : "Print")}
         </button>
       </div>
       
@@ -361,10 +506,14 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
                   invDate={new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                   customerName={customerName || "Walk-in Customer"}
                   customerPhone={customerPhone}
+                  customerEmail={customerEmail}
+                  customerAddress={customerAddress}
                   items={cart.map(c => ({ name: c.product.name, qty: c.quantity, price: c.product.price }))}
                   subtotal={subtotal}
                   discount={discountAmount}
                   advanceAmount={advanceAmount}
+                  deliveryCharge={deliveryCharge}
+                  isDeliveryPaid={isDeliveryPaid}
                   grandTotal={grandTotal}
                   notes={notes}
                />
@@ -404,13 +553,17 @@ export function TabCreateInvoice({ shop }: { shop: ApiShop | null }) {
             igLink={shop.socialLinks?.instagram || ""}
             footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
             invNumber={"INV-[AUTO]"}
-            invDate={new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+            invDate={new Date(invoiceDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
             customerName={customerName || "Walk-in Customer"}
             customerPhone={customerPhone}
+            customerEmail={customerEmail}
+            customerAddress={customerAddress}
             items={cart.map(c => ({ name: c.product.name, qty: c.quantity, price: c.product.price }))}
             subtotal={subtotal}
             discount={discountAmount}
             advanceAmount={advanceAmount}
+            deliveryCharge={deliveryCharge}
+            isDeliveryPaid={isDeliveryPaid}
             grandTotal={grandTotal}
             notes={notes}
          />

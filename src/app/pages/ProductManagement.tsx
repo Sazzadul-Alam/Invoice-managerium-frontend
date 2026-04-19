@@ -32,7 +32,6 @@ export function ProductManagement({
   // Form states
   const [formData, setFormData] = useState({
     name: "",
-    varientId: "",
     description: "A great product",
     price: "",
     stock: "",
@@ -44,7 +43,7 @@ export function ProductManagement({
   const fetchPrimaryData = async () => {
     try {
       const isFreePlan = planName.toLowerCase() === "free";
-      
+
       const [prodRes, demoRes, varRes] = await Promise.all([
         shop?._id ? productApi.getAll(false, shop._id) : Promise.resolve({ success: true, products: [], total: 0 }),
         isFreePlan ? productApi.getAll(true) : Promise.resolve({ success: true, products: [], total: 0 }),
@@ -80,7 +79,6 @@ export function ProductManagement({
     setEditingProduct(null);
     setFormData({
       name: "",
-      varientId: "",
       description: "A premium product for your collection.",
       price: "",
       stock: "",
@@ -94,7 +92,6 @@ export function ProductManagement({
     setEditingProduct(product);
     setFormData({
       name: product.name,
-      varientId: typeof product.varientId === "object" ? product.varientId._id : product.varientId || "",
       description: product.description,
       price: product.price.toString(),
       stock: product.stock.toString(),
@@ -106,7 +103,7 @@ export function ProductManagement({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.varientId || !formData.price || !formData.stock) {
+    if (!formData.name || !formData.price || !formData.stock) {
       showToast("Please fill all required fields", "error");
       return;
     }
@@ -116,7 +113,6 @@ export function ProductManagement({
     const fd = new FormData();
     fd.append("name", formData.name);
     if (shop?._id) fd.append("shopId", shop._id);
-    fd.append("varientId", formData.varientId);
     fd.append("description", formData.description);
     fd.append("price", formData.price);
     fd.append("stock", formData.stock);
@@ -225,13 +221,13 @@ export function ProductManagement({
 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-ds-on-surface truncate">{product.name}</p>
-                  <p className="text-xs text-ds-outline mt-0.5">
-                    {product.varient && product.varient.length > 0 
-                      ? `${product.varient[0].name}: ${product.varient[0].value}` 
-                      : typeof product.varientId === "object" && product.varientId 
-                        ? `${product.varientId.name}: ${product.varientId.value}` 
+                  {/* <p className="text-xs text-ds-outline mt-0.5">
+                    {product.varient && product.varient.length > 0
+                      ? `${product.varient[0].name}: ${product.varient[0].value}`
+                      : typeof product.varientId === "object" && product.varientId
+                        ? `${product.varientId.name}: ${product.varientId.value}`
                         : "No Variant"}
-                  </p>
+                  </p> */}
                   <div className="flex items-center gap-3 mt-1.5">
                     <span className="text-sm font-bold" style={{ color: "var(--ds-primary-container)" }}>
                       ৳{product.price.toLocaleString()}
@@ -247,42 +243,42 @@ export function ProductManagement({
                   </div>
                 </div>
 
-                  <div className="flex flex-col items-end gap-2">
-                    {product.isDemo ? (
-                      <span
-                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                        style={{ background: "#e0f2f1", color: "#00796b" }}
+                <div className="flex flex-col items-end gap-2">
+                  {product.isDemo ? (
+                    <span
+                      className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                      style={{ background: "#e0f2f1", color: "#00796b" }}
+                    >
+                      DEMO
+                    </span>
+                  ) : (
+                    <span
+                      className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                      style={{
+                        background: product.status === "active" ? "rgba(0,92,114,0.1)" : "var(--ds-surface-container-high)",
+                        color: product.status === "active" ? "var(--ds-primary-container)" : "var(--ds-outline)",
+                      }}
+                    >
+                      {product.status}
+                    </span>
+                  )}
+                  {!product.isDemo && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEdit(product)}
+                        className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
                       >
-                        DEMO
-                      </span>
-                    ) : (
-                      <span
-                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                        style={{
-                          background: product.status === "active" ? "rgba(0,92,114,0.1)" : "var(--ds-surface-container-high)",
-                          color: product.status === "active" ? "var(--ds-primary-container)" : "var(--ds-outline)",
-                        }}
+                        <span className="material-symbols-outlined text-base">edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product._id)}
+                        className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
                       >
-                        {product.status}
-                      </span>
-                    )}
-                    {!product.isDemo && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleOpenEdit(product)}
-                          className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-base">edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(product._id)}
-                          className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-base">delete</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                        <span className="material-symbols-outlined text-base">delete</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -320,21 +316,7 @@ export function ProductManagement({
                   style={{ background: "var(--ds-surface-container-highest)", borderColor: "var(--ds-outline-variant)" }}
                 />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-1">Variant</label>
-                <select
-                  required
-                  value={formData.varientId}
-                  onChange={(e) => setFormData({ ...formData, varientId: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-ds-primary text-sm"
-                  style={{ background: "var(--ds-surface-container-highest)", borderColor: "var(--ds-outline-variant)" }}
-                >
-                  <option value="" disabled>Select a variant</option>
-                  {varients.map((v) => (
-                    <option key={v._id} value={v._id}>{v.value}</option>
-                  ))}
-                </select>
-              </div>
+
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-1">Price</label>

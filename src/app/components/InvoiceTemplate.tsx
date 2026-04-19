@@ -13,15 +13,20 @@ export interface InvoiceTemplateProps {
 
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
+  customerAddress?: string;
 
   items: { name: string; qty: number; price: number }[];
   subtotal: number;
   discount: number;
   advanceAmount?: number;
+  deliveryCharge?: number;
+  isDeliveryPaid?: boolean;
   grandTotal: number;
 
   notes?: string;
   isDemo?: boolean;
+  noShadow?: boolean;
 }
 
 export function InvoiceTemplate({
@@ -35,197 +40,217 @@ export function InvoiceTemplate({
   invDate,
   customerName,
   customerPhone,
+  customerEmail,
+  customerAddress,
   items,
   subtotal,
   discount,
   advanceAmount = 0,
+  deliveryCharge = 0,
+  isDeliveryPaid = false,
   grandTotal,
   notes,
   isDemo,
+  noShadow,
 }: InvoiceTemplateProps) {
   return (
     <div
-      className="rounded-2xl border overflow-hidden shadow-sm"
+      className={`rounded-2xl border overflow-hidden ${noShadow ? "" : "shadow-sm"}`}
       style={{
-        background: "var(--ds-surface-container-lowest)",
-        borderColor: "var(--ds-outline-variant)",
+        background: "#ffffff",
+        borderColor: "#c0c8cc",
       }}
     >
       {/* Receipt header with shop info */}
       <div
-        className="py-5 px-5 text-center text-white"
-        style={{ background: "var(--ds-primary-container)" }}
+        className="py-5 px-5 text-center text-white bg-force"
+        style={{ background: "#005C72" }}
       >
         <h3
           className="text-xl font-extrabold"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
+          style={{ fontFamily: "'Manrope', sans-serif", color: "#ffffff" }}
         >
           {shopName}
         </h3>
-        <p className="text-xs text-white/70 mt-1 leading-relaxed">{shopAddress}</p>
-        <p className="text-xs text-white/80 font-semibold mt-0.5">{shopPhone}</p>
+        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)", marginTop: "4px", lineHeight: "1.5" }}>{shopAddress}</p>
+        <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.85)", fontWeight: 600, marginTop: "2px" }}>{shopPhone}</p>
       </div>
 
       {/* POS Invoice label */}
-      <div className="text-center py-2 border-b" style={{ borderColor: "var(--ds-outline-variant)" }}>
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ds-outline">
+      <div style={{ textAlign: "center", padding: "8px 0", borderBottom: "1px solid #c0c8cc" }}>
+        <p style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", color: "#70787d" }}>
           ─ ─ ─ &nbsp; POS Invoice &nbsp; ─ ─ ─
         </p>
       </div>
 
       {/* Invoice no + Date */}
       <div
-        className="flex justify-between px-5 py-3 text-xs border-b"
-        style={{ borderColor: "var(--ds-outline-variant)" }}
+        style={{ display: "flex", justifyContent: "space-between", padding: "12px 20px", borderBottom: "1px solid #c0c8cc" }}
       >
         <div>
-          <p className="text-ds-outline font-medium">Invoice No.</p>
-          <p className="text-ds-on-surface font-bold mt-0.5">{invNumber}</p>
+          <p style={{ fontSize: "11px", color: "#70787d", fontWeight: 500 }}>Invoice No.</p>
+          <p style={{ fontSize: "12px", color: "#191c1d", fontWeight: 700, marginTop: "2px" }}>{invNumber}</p>
         </div>
-        <div className="text-right">
-          <p className="text-ds-outline font-medium">Date</p>
-          <p className="text-ds-on-surface font-bold mt-0.5">{invDate}</p>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ fontSize: "11px", color: "#70787d", fontWeight: 500 }}>Date</p>
+          <p style={{ fontSize: "12px", color: "#191c1d", fontWeight: 700, marginTop: "2px" }}>{invDate}</p>
         </div>
       </div>
 
       {/* Customer */}
-      {(customerName || customerPhone) && (
-        <div
-          className="px-5 py-3 border-b"
-          style={{ borderColor: "var(--ds-outline-variant)" }}
-        >
-          <p className="text-ds-outline text-[10px] font-bold uppercase tracking-wider mb-1">
+      {(customerName || customerPhone || customerEmail || customerAddress) && (
+        <div style={{ padding: "12px 20px", borderBottom: "1px solid #c0c8cc" }}>
+          <p style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#70787d", marginBottom: "4px" }}>
             Billed To
           </p>
-          {customerName && <p className="text-ds-on-surface text-sm font-semibold">{customerName}</p>}
-          {customerPhone && <p className="text-ds-outline text-xs mt-0.5">{customerPhone}</p>}
+          {customerName && <p style={{ fontSize: "13px", color: "#191c1d", fontWeight: 600 }}>{customerName}</p>}
+          <div style={{ marginTop: "2px" }}>
+            {customerPhone && <p style={{ fontSize: "11px", color: "#70787d" }}>{customerPhone}</p>}
+            {customerEmail && <p style={{ fontSize: "11px", color: "#70787d" }}>{customerEmail}</p>}
+          </div>
+          {customerAddress && (
+            <p style={{ fontSize: "11px", color: "#70787d", marginTop: "4px", lineHeight: "1.4" }}>
+              {customerAddress}
+            </p>
+          )}
         </div>
       )}
 
       {/* Items table header */}
-      <div className="px-5 pt-3 pb-1">
-        <div className="flex text-[10px] font-bold uppercase tracking-wider text-ds-outline border-b pb-1.5" style={{ borderColor: "var(--ds-outline-variant)" }}>
-          <span className="flex-1">Item</span>
-          <span className="w-10 text-center">Qty</span>
-          <span className="w-16 text-right">Rate</span>
-          <span className="w-16 text-right">Amount</span>
+      <div style={{ padding: "12px 20px 4px 20px" }}>
+        <div style={{ display: "flex", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#70787d", borderBottom: "1px solid #c0c8cc", paddingBottom: "6px" }}>
+          <span style={{ flex: 1 }}>Item</span>
+          <span style={{ width: "36px", textAlign: "center" }}>Qty</span>
+          <span style={{ width: "64px", textAlign: "right" }}>Rate</span>
+          <span style={{ width: "64px", textAlign: "right" }}>Amount</span>
         </div>
       </div>
 
       {/* Items */}
-      <div className="px-5 py-2 space-y-2">
+      <div style={{ padding: "8px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
         {items.map((item, i) => (
-          <div key={i} className="flex items-start text-xs">
-            <span className="flex-1 text-ds-on-surface font-medium pr-2 leading-snug">
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", fontSize: "12px" }}>
+            <span style={{ flex: 1, color: "#191c1d", fontWeight: 500, paddingRight: "8px", lineHeight: "1.4" }}>
               {item.name.includes(" • ") ? (
                 <>
-                  {item.name.split(" • ")[0]} 
-                  <span className="text-ds-outline font-normal text-[10px]"> • {item.name.split(" • ")[1]}</span>
+                  {item.name.split(" • ")[0]}
+                  <span style={{ color: "#70787d", fontWeight: 400, fontSize: "10px" }}> • {item.name.split(" • ")[1]}</span>
                 </>
               ) : (
                 item.name
               )}
             </span>
-            <span className="w-10 text-center text-ds-outline">{item.qty}</span>
-            <span className="w-16 text-right text-ds-outline">৳{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            <span className="w-16 text-right text-ds-on-surface font-bold">
+            <span style={{ width: "36px", textAlign: "center", color: "#70787d" }}>{item.qty}</span>
+            <span style={{ width: "64px", textAlign: "right", color: "#70787d" }}>৳{item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span style={{ width: "64px", textAlign: "right", color: "#191c1d", fontWeight: 700 }}>
               ৳{(item.qty * item.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
         ))}
         {items.length === 0 && (
-           <div className="text-center text-xs text-ds-outline py-2">No items</div>
+          <div style={{ textAlign: "center", fontSize: "12px", color: "#70787d", padding: "8px 0" }}>No items</div>
         )}
       </div>
 
       {/* Dashed divider */}
-      <div className="px-5 py-1">
-        <div className="border-t border-dashed" style={{ borderColor: "var(--ds-outline-variant)" }} />
+      <div style={{ padding: "4px 20px" }}>
+        <div style={{ borderTop: "1px dashed #c0c8cc" }} />
       </div>
 
       {/* Totals */}
-      <div className="px-5 py-2 space-y-1.5">
-        <div className="flex justify-between text-xs text-ds-on-surface-variant">
-          <span>Subtotal</span>
-          <span>৳{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+      <div style={{ padding: "8px 20px", display: "flex", flexDirection: "column", gap: "6px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#3f484c" }}>
+          <span style={{ whiteSpace: "nowrap", marginRight: "8px" }}>Subtotal</span>
+          <span style={{ whiteSpace: "nowrap" }}>৳{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         {discount > 0 && (
-          <div className="flex justify-between text-xs text-green-600">
-            <span>Discount</span>
-            <span>−৳{discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#2e7d32" }}>
+            <span style={{ whiteSpace: "nowrap", marginRight: "8px" }}>Discount</span>
+            <span style={{ whiteSpace: "nowrap" }}>−৳{discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         )}
         {advanceAmount > 0 && (
-          <div className="flex justify-between text-xs text-ds-error">
-            <span>Advance Paid</span>
-            <span>−৳{advanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#ba1a1a" }}>
+            <span style={{ whiteSpace: "nowrap", marginRight: "8px" }}>Advance Paid</span>
+            <span style={{ whiteSpace: "nowrap" }}>−৳{advanceAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+        )}
+        {deliveryCharge > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#3f484c" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap", marginRight: "8px" }}>
+              Delivery Charge
+              {isDeliveryPaid && (
+                <span style={{ fontSize: "7px", fontWeight: 900, background: "#22c55e", color: "#ffffff", padding: "1px 4px", borderRadius: "2px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Paid
+                </span>
+              )}
+            </span>
+            <span style={isDeliveryPaid ? { textDecoration: "line-through", opacity: 0.4, fontStyle: "italic", whiteSpace: "nowrap" } : { whiteSpace: "nowrap" }}>
+              +৳{deliveryCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
           </div>
         )}
       </div>
 
       {/* Grand total */}
       <div
-        className="mx-5 mb-4 rounded-xl px-4 py-3 flex justify-between items-center"
-        style={{ background: "var(--ds-surface-container-low)" }}
+        className="bg-force"
+        style={{
+          margin: "4px 20px 16px 20px",
+          borderRadius: "12px",
+          padding: "12px 16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "#e8f4f8",
+          gap: "8px",
+        }}
       >
-        <span
-          className="font-extrabold text-ds-primary"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
+        <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 800, color: "#005C72", fontSize: "15px", whiteSpace: "nowrap" }}>
           Grand Total
         </span>
-        <span
-          className="text-xl font-extrabold"
-          style={{
-            color: "var(--ds-primary-container)",
-            fontFamily: "'Manrope', sans-serif",
-          }}
-        >
+        <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 800, color: "#005C72", fontSize: "20px", whiteSpace: "nowrap" }}>
           ৳{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </div>
 
       {/* Dashed divider */}
-      <div className="px-5">
-        <div className="border-t border-dashed" style={{ borderColor: "var(--ds-outline-variant)" }} />
+      <div style={{ padding: "0 20px" }}>
+        <div style={{ borderTop: "1px dashed #c0c8cc" }} />
       </div>
 
-      {/* Footer — Thank you + Social Links */}
-      <div className="text-center px-5 py-4 space-y-2.5">
+      {/* Footer */}
+      <div style={{ textAlign: "center", padding: "16px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
         {notes && (
-          <p className="text-xs text-ds-outline mb-2 font-bold">
+          <p style={{ fontSize: "12px", color: "#70787d", fontWeight: 700 }}>
             Note: {notes}
           </p>
         )}
-        <p className="text-ds-on-surface text-xs font-normal">
+        <p style={{ fontSize: "12px", color: "#191c1d", fontWeight: 400 }}>
           {footerText || "Thank you for your purchase!"}
         </p>
 
         {/* Social links */}
         {(fbLink || igLink) && (
-          <div className="space-y-1.5 pt-1">
-            <div className="border-t border-dashed mx-8 mb-2" style={{ borderColor: "var(--ds-outline-variant)" }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px", paddingTop: "4px" }}>
+            <div style={{ borderTop: "1px dashed #c0c8cc", margin: "0 32px 8px 32px" }} />
             {fbLink && (
-              <div className="flex items-center justify-center gap-2 text-xs text-ds-on-surface-variant">
-                <span className="material-symbols-outlined text-sm" style={{ color: "#1877F2" }}>
-                  public
-                </span>
-                <span className="truncate max-w-[220px]">{fbLink}</span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "12px", color: "#3f484c" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: "14px", color: "#1877F2" }}>public</span>
+                <span style={{ maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fbLink}</span>
               </div>
             )}
             {igLink && (
-              <div className="flex items-center justify-center gap-2 text-xs text-ds-on-surface-variant">
-                <span className="material-symbols-outlined text-sm" style={{ color: "#E4405F" }}>
-                  photo_camera
-                </span>
-                <span className="truncate max-w-[220px]">{igLink}</span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "12px", color: "#3f484c" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: "14px", color: "#E4405F" }}>photo_camera</span>
+                <span style={{ maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{igLink}</span>
               </div>
             )}
           </div>
         )}
 
         {isDemo && (
-          <p className="text-[10px] text-ds-outline/60 mt-1">
+          <p style={{ fontSize: "10px", color: "rgba(112,120,125,0.6)", marginTop: "4px" }}>
             ✦ Demo receipt — upgrade for real invoicing
           </p>
         )}

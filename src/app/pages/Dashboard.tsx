@@ -204,6 +204,7 @@ export function Dashboard() {
   const [cycles, setCycles] = useState<ApiBillingCycle[]>([]);
   const [mySub, setMySub] = useState<ApiUserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [invoiceToEdit, setInvoiceToEdit] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -328,8 +329,25 @@ export function Dashboard() {
         )}
         {activeTab === "products" && <ProductManagement mySub={mySub} shop={shop} />}
         {activeTab === "invoice" && <TabDemoInvoice shop={shop} />}
-        {activeTab === "create_invoice" && <TabCreateInvoice shop={shop} />}
-        {activeTab === "history" && <TabInvoiceHistory shop={shop} />}
+        {activeTab === "create_invoice" && (
+          <TabCreateInvoice 
+            shop={shop} 
+            editInvoice={invoiceToEdit} 
+            onCancelEdit={() => {
+              setInvoiceToEdit(null);
+              navigate("/dashboard/history");
+            }} 
+          />
+        )}
+        {activeTab === "history" && (
+          <TabInvoiceHistory 
+            shop={shop} 
+            onEditInvoice={(inv) => {
+              setInvoiceToEdit(inv);
+              navigate("/dashboard/create_invoice");
+            }}
+          />
+        )}
         {activeTab === "profile" && (
           <TabProfile
             user={user}
