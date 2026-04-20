@@ -322,18 +322,18 @@ export function Dashboard() {
         {activeTab === "products" && <ProductManagement mySub={mySub} shop={shop} />}
         {activeTab === "invoice" && <TabDemoInvoice shop={shop} />}
         {activeTab === "create_invoice" && (
-          <TabCreateInvoice 
-            shop={shop} 
-            editInvoice={invoiceToEdit} 
+          <TabCreateInvoice
+            shop={shop}
+            editInvoice={invoiceToEdit}
             onCancelEdit={() => {
               setInvoiceToEdit(null);
               navigate("/dashboard/history");
-            }} 
+            }}
           />
         )}
         {activeTab === "history" && (
-          <TabInvoiceHistory 
-            shop={shop} 
+          <TabInvoiceHistory
+            shop={shop}
             onEditInvoice={(inv) => {
               setInvoiceToEdit(inv);
               navigate("/dashboard/create_invoice");
@@ -1700,7 +1700,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           {/* App version */}
           <div className="text-center pt-2">
             <p className="text-[10px] text-ds-outline">
-              Kanto Invoice v1.0.0 · Built with ♥ in Dhaka
+              {process.env.APP_NAME} v1.0.0 · Built with ♥ Kanto065@gmail.com
             </p>
           </div>
         </div>
