@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { type ApiShop, type ApiProduct, productApi, invoiceApi } from "../auth.utils";
+import { type ApiShop, type ApiInvoice, invoiceApi, type ApiProduct, productApi } from "../auth.utils";
 import { InvoiceTemplate } from "../components/InvoiceTemplate";
+import { InvoiceWrapper } from "../components/InvoiceWrapper";
 
 function formatAddress(addr: ApiShop["address"]): string {
   return addr?.address_line1 || "";
@@ -40,6 +41,7 @@ export function TabCreateInvoice({
 
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [lastSavedInvoice, setLastSavedInvoice] = useState<ApiInvoice | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
@@ -170,30 +172,36 @@ export function TabCreateInvoice({
       };
 
       if (editInvoice) {
-        await invoiceApi.updateInvoice(shop._id, editInvoice._id, payload);
+        const res = await invoiceApi.updateInvoice(shop._id, editInvoice._id, payload);
+        setLastSavedInvoice(res.invoice);
         showToast("Invoice updated successfully!", "success");
       } else {
-        await invoiceApi.createInvoice(shop._id, payload);
+        const res = await invoiceApi.createInvoice(shop._id, payload);
+        setLastSavedInvoice(res.invoice);
         showToast("Invoice created successfully!", "success");
       }
       success = true;
     } catch (err: any) {
       showToast(err.message || "Failed to create invoice", "error");
     } finally {
-      setSaving(false);
       if (success) {
+        setSaving(false);
         if (triggerPrint) {
+          // Wait a bit longer for React to render the new ID into the hidden print template
           setTimeout(() => {
             window.print();
             setTimeout(() => {
               setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
+              setLastSavedInvoice(null);
               if (onCancelEdit) onCancelEdit();
             }, 1000);
-          }, 300);
+          }, 500); 
         } else {
           setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
           if (onCancelEdit) onCancelEdit();
         }
+      } else {
+        setSaving(false);
       }
     }
   };
@@ -510,27 +518,28 @@ export function TabCreateInvoice({
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 w-full">
-                <InvoiceTemplate
-                  shopName={shop.name}
-                  shopAddress={formatAddress(shop.address)}
-                  shopPhone={shop.contactNumber || ""}
-                  fbLink={shop.socialLinks?.facebook || ""}
-                  igLink={shop.socialLinks?.instagram || ""}
-                  footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
-                  invNumber={editInvoice ? editInvoice.invoiceNumber : "INV-[AUTO]"}
-                  invDate={new Date(invoiceDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                  customerName={customerName || "Walk-in Customer"}
-                  customerPhone={customerPhone}
-                  customerEmail={customerEmail}
-                  customerAddress={customerAddress}
-                  items={cart.map(c => ({ name: c.variety ? `${c.product.name} (${c.variety})` : c.product.name, qty: c.quantity, price: c.product.price }))}
-                  subtotal={subtotal}
-                  discount={discountAmount}
-                  advanceAmount={advanceAmount}
-                  deliveryCharge={deliveryCharge}
-                  isDeliveryPaid={isDeliveryPaid}
-                  grandTotal={grandTotal}
-                  notes={notes}
+                {/* Use Wrapper for Preview to maintain logic consistency */}
+                <InvoiceWrapper 
+                  shop={shop}
+                  invoice={{
+                    _id: "preview",
+                    invoiceNumber: editInvoice ? editInvoice.invoiceNumber : "INV-[AUTO]",
+                    invoiceDate: invoiceDate,
+                    createdAt: new Date().toISOString(),
+                    customerName,
+                    customerPhone,
+                    customerEmail,
+                    customerAddress,
+                    items: cart.map(c => ({ name: c.variety ? `${c.product.name} (${c.variety})` : c.product.name, quantity: c.quantity, unitPrice: c.product.price })),
+                    subtotal,
+                    discountAmount,
+                    advanceAmount,
+                    deliveryCharge,
+                    isDeliveryPaid,
+                    grandTotal,
+                    notes,
+                    status: "draft"
+                  } as any}
                 />
               </div>
 
@@ -560,27 +569,27 @@ export function TabCreateInvoice({
       {/* ── Hidden Printable Invoice Template ── */}
       <div className="hidden print:block absolute top-0 left-0 z-[99999] bg-white text-black p-0 m-0 w-full h-auto">
         <div className="max-w-xl mx-auto align-top">
-          <InvoiceTemplate
-            shopName={shop.name}
-            shopAddress={formatAddress(shop.address)}
-            shopPhone={shop.contactNumber || ""}
-            fbLink={shop.socialLinks?.facebook || ""}
-            igLink={shop.socialLinks?.instagram || ""}
-            footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
-            invNumber={editInvoice ? editInvoice.invoiceNumber : "INV-[AUTO]"}
-            invDate={new Date(invoiceDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-            customerName={customerName || "Walk-in Customer"}
-            customerPhone={customerPhone}
-            customerEmail={customerEmail}
-            customerAddress={customerAddress}
-            items={cart.map(c => ({ name: c.variety ? `${c.product.name} (${c.variety})` : c.product.name, qty: c.quantity, price: c.product.price }))}
-            subtotal={subtotal}
-            discount={discountAmount}
-            advanceAmount={advanceAmount}
-            deliveryCharge={deliveryCharge}
-            isDeliveryPaid={isDeliveryPaid}
-            grandTotal={grandTotal}
-            notes={notes}
+          {/* Priority: Use lastSavedInvoice (real ID) if available, otherwise fallback to current state */}
+          <InvoiceWrapper 
+            shop={shop}
+            invoice={lastSavedInvoice || ({
+              invoiceNumber: editInvoice ? editInvoice.invoiceNumber : "INV-[AUTO]",
+              invoiceDate: invoiceDate,
+              createdAt: new Date().toISOString(),
+              customerName,
+              customerPhone,
+              customerEmail,
+              customerAddress,
+              items: cart.map(c => ({ name: c.variety ? `${c.product.name} (${c.variety})` : c.product.name, quantity: c.quantity, unitPrice: c.product.price })),
+              subtotal,
+              discountAmount,
+              advanceAmount,
+              deliveryCharge,
+              isDeliveryPaid,
+              grandTotal,
+              notes,
+            } as any)}
+            noShadow
           />
         </div>
       </div>
