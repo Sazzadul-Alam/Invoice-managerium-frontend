@@ -250,6 +250,9 @@ export function InvoiceTemplate({
           <p style={{ fontSize: "10px", color: "#000000", fontWeight: 700 }}>
             {footerText || "Thank you for your purchase!"}
           </p>
+          <p style={{ fontSize: "9px", color: "#000000", fontWeight: 400, fontStyle: "italic", marginTop: "2px" }}>
+            Contact Support: 01605742247
+          </p>
 
           {/* Social links */}
           {(fbLink || igLink) && (

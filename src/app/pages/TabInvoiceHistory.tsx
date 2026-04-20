@@ -126,10 +126,11 @@ export function TabInvoiceHistory({
 
   const handlePrintSelected = () => {
     setIsPrintingMultiple(true);
+    // Give it a full second to render all selected templates in the background
     setTimeout(() => {
       window.print();
       setIsPrintingMultiple(false);
-    }, 500);
+    }, 1000);
   };
 
   const getStatusColor = (status: ApiInvoice["status"]) => {
@@ -471,7 +472,14 @@ export function TabInvoiceHistory({
             {invoices
               .filter((inv) => selectedIds.includes(inv._id))
               .map((inv, index) => (
-                <div key={inv._id} style={{ breakBefore: index > 0 ? "page" : "auto", paddingTop: index > 0 ? "2rem" : "0" }}>
+                <div 
+                  key={inv._id} 
+                  style={{ 
+                    breakAfter: "always", 
+                    pageBreakAfter: "always",
+                    paddingBottom: "2rem" 
+                  }}
+                >
                   <InvoiceWrapper 
                     shop={shop} 
                     invoice={inv} 
