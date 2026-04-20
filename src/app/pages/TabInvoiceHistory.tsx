@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import domtoimage from "dom-to-image-more";
 import { type ApiShop, type ApiInvoice, invoiceApi } from "../auth.utils";
 import { InvoiceTemplate } from "../components/InvoiceTemplate";
+import { InvoiceWrapper } from "../components/InvoiceWrapper";
 
 function formatAddress(addr: ApiShop["address"]): string {
   return addr?.address_line1 || "";
@@ -103,7 +104,7 @@ export function TabInvoiceHistory({
           const dataUrl = await (domtoimage as any).toPng(exportRef.current, {
             quality: 1.0,
             bgcolor: "#ffffff",
-            width: 320,
+            width: 360, // Increased for breathing room
           });
           const link = document.createElement("a");
           link.href = dataUrl;
@@ -328,17 +329,20 @@ export function TabInvoiceHistory({
       </div>
 
       {/* Off-screen Capture Area */}
-      <div className="fixed top-0 left-[-9999px] pointer-events-none" style={{ width: "320px" }}>
-        <div ref={exportRef} id="export-container" style={{ width: "320px", background: "#ffffff" }}>
+      <div className="fixed top-0 left-[-9999px] pointer-events-none" style={{ width: "360px" }}>
+        <div ref={exportRef} id="export-container" style={{ width: "360px", background: "#ffffff" }}>
           <style>{`
   /* Import fonts for the capture context */
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
 
   /* Ultra-Tight Digital Export Styling */
   #export-container {
-    padding: 0 !important;
+    padding: 20px !important;
     background-color: #ffffff !important;
-    width: 320px !important;
+    width: 360px !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
     font-family: 'Inter', sans-serif !important;
     -webkit-font-smoothing: antialiased;
   }
@@ -388,24 +392,10 @@ export function TabInvoiceHistory({
 `}</style>
           {exportingInvoice && (
             <div style={{ backgroundColor: "#ffffff", padding: "0px" }}>
-              <InvoiceTemplate
-                shopName={shop.name}
-                shopAddress={formatAddress(shop.address)}
-                shopPhone={(shop as any).contact_number}
-                invoiceNumber={exportingInvoice.invoiceNumber}
-                invoiceDate={new Date(exportingInvoice.invoiceDate || exportingInvoice.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                customerName={exportingInvoice.customerName}
-                customerPhone={exportingInvoice.customerPhone}
-                customerAddress={exportingInvoice.customerAddress}
-                items={exportingInvoice.items || []}
-                subTotal={exportingInvoice.subtotal}
-                discount={exportingInvoice.discountAmount}
-                deliveryCharge={exportingInvoice.deliveryCharge}
-                advancePayment={exportingInvoice.advanceAmount}
-                isDeliveryPaid={exportingInvoice.isDeliveryPaid}
-                grandTotal={exportingInvoice.grandTotal}
-                notes={exportingInvoice.notes}
-                noShadow={false}
+              <InvoiceWrapper 
+                shop={shop} 
+                invoice={exportingInvoice} 
+                noShadow={false} 
               />
             </div>
           )}
@@ -420,33 +410,15 @@ export function TabInvoiceHistory({
               <h2 className="text-lg font-bold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>
                 Invoice #{previewInvoice.invoiceNumber}
               </h2>
-              <button onClick={() => setPreviewInvoice(null)} className="p-2 rounded-full hover:bg-ds-surface-container-high transition-colors text-ds-on-surface">
+            <button onClick={() => setPreviewInvoice(null)} className="p-2 rounded-full hover:bg-ds-surface-container-high transition-colors text-ds-on-surface">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 w-full">
-              <InvoiceTemplate
-                shopName={shop.name}
-                shopAddress={formatAddress(shop.address)}
-                shopPhone={shop.contactNumber || ""}
-                fbLink={shop.socialLinks?.facebook || ""}
-                igLink={shop.socialLinks?.instagram || ""}
-                footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
-                invNumber={previewInvoice.invoiceNumber}
-                invDate={new Date(previewInvoice.invoiceDate || previewInvoice.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                customerName={previewInvoice.customerName || "Walk-in Customer"}
-                customerPhone={previewInvoice.customerPhone}
-                customerEmail={previewInvoice.customerEmail}
-                customerAddress={previewInvoice.customerAddress}
-                items={previewInvoice.items.map(c => ({ name: c.name, qty: c.quantity, price: c.unitPrice }))}
-                subtotal={previewInvoice.subtotal}
-                discount={previewInvoice.discountAmount}
-                advanceAmount={previewInvoice.advanceAmount}
-                deliveryCharge={previewInvoice.deliveryCharge}
-                isDeliveryPaid={previewInvoice.isDeliveryPaid}
-                grandTotal={previewInvoice.grandTotal}
-                notes={previewInvoice.notes}
+              <InvoiceWrapper 
+                shop={shop} 
+                invoice={previewInvoice} 
               />
             </div>
 
@@ -483,27 +455,10 @@ export function TabInvoiceHistory({
       {previewInvoice && (
         <div className="hidden print:block fixed inset-0 z-[99999] bg-white text-black p-0 m-0 w-full min-h-screen">
           <div className="max-w-xl mx-auto align-top">
-            <InvoiceTemplate
-              shopName={shop.name}
-              shopAddress={formatAddress(shop.address)}
-              shopPhone={shop.contactNumber || ""}
-              fbLink={shop.socialLinks?.facebook || ""}
-              igLink={shop.socialLinks?.instagram || ""}
-              footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
-              invNumber={previewInvoice.invoiceNumber}
-              invDate={new Date(previewInvoice.invoiceDate || previewInvoice.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-              customerName={previewInvoice.customerName || "Walk-in Customer"}
-              customerPhone={previewInvoice.customerPhone}
-              customerEmail={previewInvoice.customerEmail}
-              customerAddress={previewInvoice.customerAddress}
-              items={previewInvoice.items.map(c => ({ name: c.name, qty: c.quantity, price: c.unitPrice }))}
-              subtotal={previewInvoice.subtotal}
-              discount={previewInvoice.discountAmount}
-              advanceAmount={previewInvoice.advanceAmount}
-              deliveryCharge={previewInvoice.deliveryCharge}
-              isDeliveryPaid={previewInvoice.isDeliveryPaid}
-              grandTotal={previewInvoice.grandTotal}
-              notes={previewInvoice.notes}
+            <InvoiceWrapper 
+              shop={shop} 
+              invoice={previewInvoice} 
+              noShadow 
             />
           </div>
         </div>
@@ -517,27 +472,10 @@ export function TabInvoiceHistory({
               .filter((inv) => selectedIds.includes(inv._id))
               .map((inv, index) => (
                 <div key={inv._id} style={{ breakBefore: index > 0 ? "page" : "auto", paddingTop: index > 0 ? "2rem" : "0" }}>
-                  <InvoiceTemplate
-                    shopName={shop.name}
-                    shopAddress={formatAddress(shop.address)}
-                    shopPhone={shop.contactNumber || ""}
-                    fbLink={shop.socialLinks?.facebook || ""}
-                    igLink={shop.socialLinks?.instagram || ""}
-                    footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
-                    invNumber={inv.invoiceNumber}
-                    invDate={new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                    customerName={inv.customerName || "Walk-in Customer"}
-                    customerPhone={inv.customerPhone}
-                    customerEmail={inv.customerEmail}
-                    customerAddress={inv.customerAddress}
-                    items={inv.items.map(c => ({ name: c.name, qty: c.quantity, price: c.unitPrice }))}
-                    subtotal={inv.subtotal}
-                    discount={inv.discountAmount}
-                    advanceAmount={inv.advanceAmount}
-                    deliveryCharge={inv.deliveryCharge}
-                    isDeliveryPaid={inv.isDeliveryPaid}
-                    grandTotal={inv.grandTotal}
-                    notes={inv.notes}
+                  <InvoiceWrapper 
+                    shop={shop} 
+                    invoice={inv} 
+                    noShadow
                   />
                 </div>
               ))}
