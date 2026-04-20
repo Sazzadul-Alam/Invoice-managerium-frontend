@@ -100,15 +100,7 @@ type TabKey = string;
 /* ────────────────────────────────────────────────────────────────────────── */
 
 function formatAddress(addr: ApiShop["address"]): string {
-  const parts = [
-    addr.address_line1,
-    addr.address_line2,
-    addr.city,
-    addr.state,
-    addr.postal_code,
-    addr.country,
-  ].filter(Boolean);
-  return parts.join(", ");
+  return addr?.address_line1 || "";
 }
 
 function formatDate(dateStr: string): string {

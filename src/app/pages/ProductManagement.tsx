@@ -164,8 +164,8 @@ export function ProductManagement({
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      {/* Header - Locked/Sticky */}
+      <div className="sticky top-[-20px] z-20 bg-ds-background/95 backdrop-blur-sm -mx-4 px-4 py-3 flex items-center justify-between border-b border-ds-outline-variant/30 mb-2">
         <div>
           <h2 className="text-lg font-extrabold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>
             My Products
@@ -176,7 +176,7 @@ export function ProductManagement({
         </div>
         <button
           onClick={handleOpenCreate}
-          className="flex items-center gap-1 text-xs font-bold px-3 py-2 rounded-xl text-white active:scale-95 transition-all"
+          className="h-10 flex items-center gap-1.5 px-4 rounded-xl text-white font-bold text-xs active:scale-95 transition-all shadow-sm"
           style={{ background: "var(--ds-primary-container)" }}
         >
           <span className="material-symbols-outlined text-base">add</span>

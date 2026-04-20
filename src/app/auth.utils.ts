@@ -823,6 +823,7 @@ export interface ApiInvoice {
   grandTotal: number;
   notes: string;
   status: "draft" | "issued" | "paid" | "void" | "printed";
+  invoiceDate: string;
   createdAt: string;
   updatedAt: string;
 }

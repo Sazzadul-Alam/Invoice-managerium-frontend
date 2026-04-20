@@ -3,24 +3,15 @@ import { type ApiShop, type ApiProduct, productApi, invoiceApi } from "../auth.u
 import { InvoiceTemplate } from "../components/InvoiceTemplate";
 
 function formatAddress(addr: ApiShop["address"]): string {
-  if (!addr) return "";
-  const parts = [
-    addr.address_line1,
-    addr.address_line2,
-    addr.city,
-    addr.state,
-    addr.postal_code,
-    addr.country,
-  ].filter(Boolean);
-  return parts.join(", ");
+  return addr?.address_line1 || "";
 }
 
-export function TabCreateInvoice({ 
-  shop, 
-  editInvoice, 
-  onCancelEdit 
-}: { 
-  shop: ApiShop | null; 
+export function TabCreateInvoice({
+  shop,
+  editInvoice,
+  onCancelEdit
+}: {
+  shop: ApiShop | null;
   editInvoice?: any;
   onCancelEdit?: () => void;
 }) {
@@ -32,7 +23,12 @@ export function TabCreateInvoice({
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const getLocalYYYYMMDD = () => {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+  };
+  const [invoiceDate, setInvoiceDate] = useState(getLocalYYYYMMDD());
 
   const [cart, setCart] = useState<{ cartItemId: string; product: ApiProduct; quantity: number; variety?: string }[]>([]);
   const [discountType, setDiscountType] = useState<"flat" | "percentage">("flat");
@@ -64,14 +60,14 @@ export function TabCreateInvoice({
       setCustomerPhone(editInvoice.customerPhone || "");
       setCustomerEmail(editInvoice.customerEmail || "");
       setCustomerAddress(editInvoice.customerAddress || "");
-      setInvoiceDate(new Date(editInvoice.createdAt).toISOString().split('T')[0]);
+      setInvoiceDate(new Date(editInvoice.invoiceDate || editInvoice.createdAt).toISOString().split('T')[0]);
       setDiscountType(editInvoice.discountType || "flat");
       setDiscountValue(editInvoice.discount || 0);
       setAdvanceAmount(editInvoice.advanceAmount || 0);
       setDeliveryCharge(editInvoice.deliveryCharge || 0);
       setIsDeliveryPaid(editInvoice.isDeliveryPaid || false);
       setNotes(editInvoice.notes || "");
-      
+
       const newCart = editInvoice.items.map((it: any) => {
         // Try to find matching product or create dummy
         const found = products.find(p => p.name === it.name.split(' (')[0]);
@@ -151,12 +147,26 @@ export function TabCreateInvoice({
           unitPrice: c.product.price,
         };
       });
-      
+
+      let finalDateStr;
+      if (invoiceDate) {
+        const [y, m, d] = invoiceDate.split('-').map(Number);
+        if (editInvoice && editInvoice.createdAt) {
+          const original = new Date(editInvoice.createdAt);
+          original.setFullYear(y, m - 1, d);
+          finalDateStr = original.toISOString();
+        } else {
+          const now = new Date();
+          now.setFullYear(y, m - 1, d);
+          finalDateStr = now.toISOString();
+        }
+      }
+
       const payload = {
-        customerName, customerPhone, customerEmail, customerAddress, 
+        customerName, customerPhone, customerEmail, customerAddress,
         items, discountType, discount: discountValue, advanceAmount, deliveryCharge, isDeliveryPaid, notes,
         status: triggerPrint ? "printed" : "issued",
-        date: invoiceDate ? new Date(invoiceDate).toISOString() : undefined,
+        date: finalDateStr,
       };
 
       if (editInvoice) {
@@ -175,10 +185,10 @@ export function TabCreateInvoice({
         if (triggerPrint) {
           setTimeout(() => {
             window.print();
-              setTimeout(() => {
-                setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
-                if (onCancelEdit) onCancelEdit();
-              }, 1000);
+            setTimeout(() => {
+              setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
+              if (onCancelEdit) onCancelEdit();
+            }, 1000);
           }, 300);
         } else {
           setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
@@ -192,64 +202,70 @@ export function TabCreateInvoice({
 
   return (
     <>
-    <div className="px-4 pt-5 pb-4 space-y-6 print:hidden">
-      {/* Toast */}
-      {toast && (
-        <div
-          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium w-[90%] max-w-sm animate-in"
-          style={{
-            background: toast.type === "success" ? "var(--ds-secondary-container)" : "var(--ds-error-container)",
-            color: toast.type === "success" ? "var(--ds-on-secondary-container)" : "var(--ds-on-error-container)",
-          }}
-        >
-          <span className="material-symbols-outlined text-base">
-            {toast.type === "success" ? "check_circle" : "error"}
-          </span>
-          {toast.msg}
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-extrabold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>
-            {editInvoice ? "Edit Invoice" : "Create Invoice"}
-          </h2>
-          <p className="text-xs text-ds-outline">
-            {editInvoice ? `Modifying #${editInvoice.invoiceNumber}` : "Draft a new invoice for your customer"}
-          </p>
-        </div>
-        {editInvoice && onCancelEdit && (
-          <button 
-            onClick={onCancelEdit}
-            className="px-3 py-1.5 rounded-lg border border-ds-outline text-ds-outline text-[10px] font-bold uppercase tracking-wider active:scale-95 transition-all"
+      <div className="px-4 pt-5 pb-4 space-y-6 print:hidden">
+        {/* Toast */}
+        {toast && (
+          <div
+            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium w-[90%] max-w-sm animate-in"
+            style={{
+              background: toast.type === "success" ? "var(--ds-secondary-container)" : "var(--ds-error-container)",
+              color: toast.type === "success" ? "var(--ds-on-secondary-container)" : "var(--ds-on-error-container)",
+            }}
           >
-            Cancel
-          </button>
+            <span className="material-symbols-outlined text-base">
+              {toast.type === "success" ? "check_circle" : "error"}
+            </span>
+            {toast.msg}
+          </div>
         )}
-      </div>
 
-      {/* Customer & Invoice Area */}
-      <div className="space-y-4 rounded-xl border p-4 bg-ds-surface-container-lowest" style={{ borderColor: 'var(--ds-outline-variant)' }}>
-        <div className="flex items-center justify-between mb-2">
-           <h3 className="text-sm font-bold text-ds-primary tracking-wide uppercase">Details</h3>
-           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-ds-surface-container-low border border-ds-outline-variant">
-             <span className="material-symbols-outlined text-[16px] text-ds-outline">calendar_today</span>
-             <input 
-               type="date" 
-               value={invoiceDate} 
-               onChange={e => setInvoiceDate(e.target.value)} 
-               className="text-xs font-bold bg-transparent outline-none text-ds-on-surface"
-             />
-           </div>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>
+              {editInvoice ? "Edit Invoice" : "Create Invoice"}
+            </h2>
+            <p className="text-xs text-ds-outline">
+              {editInvoice ? `Modifying #${editInvoice.invoiceNumber}` : "Draft a new invoice for your customer"}
+            </p>
+          </div>
+          {editInvoice && onCancelEdit && (
+            <button
+              onClick={onCancelEdit}
+              className="px-3 py-1.5 rounded-lg border border-ds-outline text-ds-outline text-[10px] font-bold uppercase tracking-wider active:scale-95 transition-all"
+            >
+              Cancel
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-           <div className="col-span-2 sm:col-span-1">
-             <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Name</label>
-             <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="e.g. John Doe" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
-           </div>
-           <div className="col-span-2 sm:col-span-1">
+        {/* Customer & Invoice Area */}
+        <div className="space-y-4 rounded-xl border p-4 bg-ds-surface-container-lowest" style={{ borderColor: 'var(--ds-outline-variant)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold text-ds-primary tracking-wide uppercase">Details</h3>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pb-2 border-b border-ds-outline-variant/50">
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Invoice Date</label>
+              <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-ds-surface-container-low border border-ds-outline-variant focus-within:border-ds-primary-container transition-all">
+                <span className="material-symbols-outlined text-[18px] text-ds-primary">calendar_today</span>
+                <input
+                  type="date"
+                  value={invoiceDate}
+                  onChange={e => setInvoiceDate(e.target.value)}
+                  className="w-full text-sm font-bold bg-transparent outline-none text-ds-on-surface"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Name</label>
+              <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="e.g. John Doe" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
               <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Phone</label>
               <input type="text" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="01XXX-XXXXXX" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
             </div>
@@ -261,86 +277,89 @@ export function TabCreateInvoice({
               <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Address</label>
               <input type="text" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder="e.g. 123 Street, Dhaka" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
             </div>
-        </div>
-      </div>
-
-      {/* Cart & Products */}
-      <div className="space-y-4 rounded-xl border p-4 bg-ds-surface-container-lowest" style={{ borderColor: 'var(--ds-outline-variant)' }}>
-        <h3 className="text-sm font-bold text-ds-primary tracking-wide mb-2 uppercase">Products</h3>
-        
-        {/* Search Input */}
-        <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-2.5 text-ds-outline text-lg pointer-events-none">search</span>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search products..."
-            className="w-full pl-10 pr-4 py-2.5 bg-ds-surface-container-low border border-ds-outline-variant rounded-xl focus:outline-none text-sm focus:border-ds-primary-container"
-          />
-          {searchQuery && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-ds-outline-variant rounded-xl shadow-lg max-h-48 overflow-y-auto">
-              {filteredProducts.length === 0 ? (
-                <div className="p-3 text-xs text-center text-ds-outline">No products found</div>
-              ) : (
-                filteredProducts.map(p => {
-                  const variantInfo = typeof p.varientId === 'object' && p.varientId ? ` • ${p.varientId.name}: ${p.varientId.value}` : "";
-                  return (
-                    <button
-                      key={p._id}
-                      onClick={() => addToCart(p)}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-ds-surface-container-high transition-colors flex justify-between items-center"
-                    >
-                      <div className="truncate max-w-[75%]">
-                        <span className="font-medium text-ds-on-surface">{p.name}</span>
-                        {variantInfo && <span className="text-ds-outline text-xs">{variantInfo}</span>}
-                      </div>
-                      <span className="text-ds-primary font-bold text-xs shrink-0">৳{p.price}</span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Selected Products */}
-        {cart.length > 0 && (
-          <div className="space-y-2 mt-4 max-h-64 overflow-y-auto pr-1">
-            {cart.map(item => (
-              <div key={item.cartItemId} className="flex justify-between items-center p-3 border border-ds-outline-variant rounded-xl bg-ds-surface-container-low">
-                <div className="flex-1 min-w-0 pr-2">
-                  <p className="text-xs font-semibold truncate text-ds-on-surface">
+        {/* Cart & Products */}
+        <div className="space-y-4 rounded-xl border p-4 bg-ds-surface-container-lowest" style={{ borderColor: 'var(--ds-outline-variant)' }}>
+          <h3 className="text-sm font-bold text-ds-primary tracking-wide mb-2 uppercase">Products</h3>
+
+          {/* Search Input */}
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3 top-2.5 text-ds-outline text-lg pointer-events-none">search</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search products..."
+              className="w-full pl-10 pr-4 py-2.5 bg-ds-surface-container-low border border-ds-outline-variant rounded-xl focus:outline-none text-sm focus:border-ds-primary-container"
+            />
+            {searchQuery && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-ds-outline-variant rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                {filteredProducts.length === 0 ? (
+                  <div className="p-3 text-xs text-center text-ds-outline">No products found</div>
+                ) : (
+                  filteredProducts.map(p => {
+                    const variantInfo = typeof p.varientId === 'object' && p.varientId ? ` • ${p.varientId.name}: ${p.varientId.value}` : "";
+                    return (
+                      <button
+                        key={p._id}
+                        onClick={() => addToCart(p)}
+                        className="w-full text-left px-4 py-2 text-sm hover:bg-ds-surface-container-high transition-colors flex justify-between items-center"
+                      >
+                        <div className="truncate max-w-[75%]">
+                          <span className="font-medium text-ds-on-surface">{p.name}</span>
+                          {variantInfo && <span className="text-ds-outline text-xs">{variantInfo}</span>}
+                        </div>
+                        <span className="text-ds-primary font-bold text-xs shrink-0">৳{p.price}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Selected Products */}
+          {cart.length > 0 && (
+            <div className="space-y-2 mt-4">
+              {cart.map(item => (
+              <div key={item.cartItemId} className="flex items-center p-2.5 border border-ds-outline-variant/60 rounded-xl bg-ds-surface-container-lowest hover:border-ds-primary/20 transition-colors">
+                <div className="flex-1 min-w-0 pr-3">
+                  <p className="text-[12px] font-bold truncate text-ds-on-surface flex items-center gap-1.5">
                     {item.product.name}
                     {typeof item.product.varientId === 'object' && item.product.varientId && (
-                      <span className="text-red-600 font-bold"> • {item.product.varientId.name}: {item.product.varientId.value}</span>
+                      <span className="text-[10px] font-black text-red-600 bg-red-50 px-1 rounded">
+                        {item.product.varientId.value}
+                      </span>
                     )}
                   </p>
-                  <p className="text-[10px] text-ds-outline">৳{item.product.price} each</p>
+                  <p className="text-[10px] text-ds-outline font-medium">৳{item.product.price} each</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative group">
+                
+                <div className="flex items-center gap-3">
+                  <div className="relative">
                     <select 
                       value={item.variety || "M"} 
                       onChange={(e) => updateVariety(item.cartItemId, e.target.value)}
-                      className="appearance-none text-[10px] font-black bg-ds-primary/5 text-ds-primary border border-ds-primary/20 rounded-lg pl-2 pr-5 py-1.5 outline-none focus:ring-1 focus:ring-ds-primary/30 transition-all cursor-pointer"
+                      className="appearance-none text-[10px] font-bold bg-ds-surface-container-low text-ds-on-surface border border-ds-outline-variant/50 rounded-lg pl-2 pr-6 py-1.5 outline-none focus:border-ds-primary/30 transition-all cursor-pointer"
                     >
                       <option value="M">M</option>
                       <option value="L">L</option>
                       <option value="XL">XL</option>
                       <option value="XXL">XXL</option>
                     </select>
-                    <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-[12px] pointer-events-none text-ds-primary">expand_more</span>
+                    <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[14px] pointer-events-none text-ds-outline">unfold_more</span>
                   </div>
                   
-                  <div className="flex items-center bg-ds-surface-container-lowest border border-ds-outline-variant rounded-lg p-0.5 shadow-sm">
+                  <div className="flex items-center bg-ds-surface-container-low border border-ds-outline-variant/50 rounded-lg p-0.5">
                     <button 
                       onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)} 
                       className="p-1 rounded-md hover:bg-ds-surface-container-high text-ds-outline active:scale-90 transition-transform"
                     >
                       <span className="material-symbols-outlined text-[14px]">remove</span>
                     </button>
-                    <span className="text-[11px] font-bold w-6 text-center text-ds-on-surface">{item.quantity}</span>
+                    <span className="text-[11px] font-extrabold w-5 text-center text-ds-on-surface">{item.quantity}</span>
                     <button 
                       onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)} 
                       className="p-1 rounded-md hover:bg-ds-surface-container-high text-ds-primary active:scale-90 transition-transform"
@@ -350,24 +369,24 @@ export function TabCreateInvoice({
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Calculations & Notes */}
-      <div className="space-y-4 rounded-xl border p-4 bg-ds-surface-container-lowest" style={{ borderColor: 'var(--ds-outline-variant)' }}>
-        
-        <div className="flex items-center justify-between">
-           <span className="text-sm font-semibold text-ds-on-surface-variant">Subtotal</span>
-           <span className="text-sm font-bold text-ds-on-surface">৳{subtotal.toFixed(2)}</span>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="space-y-2">
-           <div className="flex items-center justify-between">
-             <span className="text-sm font-semibold text-ds-on-surface-variant">Discount</span>
-             <div className="flex gap-2">
-                <select value={discountType} onChange={(e) => setDiscountType(e.target.value as "flat" | "percentage")} className="text-xs border border-ds-outline-variant rounded-lg bg-ds-surface-container-low px-2 py-1 outline-none">
+        {/* Calculations & Notes */}
+        <div className="space-y-4 rounded-xl border p-4 bg-ds-surface-container-lowest" style={{ borderColor: 'var(--ds-outline-variant)' }}>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-ds-on-surface-variant">Subtotal</span>
+            <span className="text-sm font-bold text-ds-on-surface">৳{subtotal.toFixed(2)}</span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-ds-on-surface-variant">Discount</span>
+              <div className="flex gap-2">
+                <select value={discountType} onChange={(e) => setDiscountType(e.target.value as "flat" | "percentage")} className="text-xs border border-ds-outline-variant rounded-lg bg-ds-surface-container-low px-2 py-1.5 outline-none focus:border-ds-primary-container">
                   <option value="flat">Flat (৳)</option>
                   <option value="percentage">%</option>
                 </select>
@@ -377,138 +396,134 @@ export function TabCreateInvoice({
                   value={discountValue || ""}
                   onChange={(e) => setDiscountValue(Number(e.target.value))}
                   placeholder="0"
-                  className="w-16 text-right border border-ds-outline-variant rounded-lg text-sm px-2 py-1 outline-none bg-ds-surface-container-low"
+                  className="w-20 text-right border border-ds-outline-variant rounded-lg text-sm px-2 py-1.5 outline-none bg-ds-surface-container-low focus:border-ds-primary-container"
                 />
-             </div>
-           </div>
-           {discountValue > 0 && (
-             <div className="flex justify-end">
-               <span className="text-xs text-ds-error font-medium">- ৳{discountAmount.toFixed(2)}</span>
-             </div>
-           )}
-        </div>
-
-        <div className="flex items-center justify-between">
-           <span className="text-sm font-semibold text-ds-on-surface-variant">Advance Payment</span>
-           <input
-             type="number"
-             min="0"
-             value={advanceAmount || ""}
-             onChange={(e) => setAdvanceAmount(Number(e.target.value))}
-             placeholder="0"
-             className="w-24 text-right border border-ds-outline-variant rounded-lg text-sm px-2 py-1 outline-none bg-ds-surface-container-low"
-           />
-        </div>
-
-        <div className="flex items-center justify-between">
-           <span className="text-sm font-semibold text-ds-on-surface-variant">Delivery Charge</span>
-            {isDeliveryPaid ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-ds-outline line-through opacity-50">৳{deliveryCharge}</span>
-                <span className="px-2 py-0.5 rounded-md bg-green-500 text-white text-[10px] font-black uppercase tracking-wider shadow-sm">PAID</span>
               </div>
-            ) : (
-              <input
-                type="number"
-                min="0"
-                value={deliveryCharge || ""}
-                onChange={(e) => setDeliveryCharge(Number(e.target.value))}
-                placeholder="0"
-                className="w-24 text-right border border-ds-outline-variant rounded-lg text-sm px-2 py-1 outline-none bg-ds-surface-container-low"
-              />
+            </div>
+            {discountValue > 0 && (
+              <div className="flex justify-end">
+                <span className="text-xs text-ds-error font-medium">- ৳{discountAmount.toFixed(2)}</span>
+              </div>
             )}
-         </div>
+          </div>
 
-         <div className="flex items-center justify-between py-1">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="deliveryPaid"
-                checked={isDeliveryPaid}
-                onChange={(e) => setIsDeliveryPaid(e.target.checked)}
-                className="w-4 h-4 rounded border-ds-outline-variant text-ds-primary focus:ring-ds-primary cursor-pointer"
-              />
-              <label htmlFor="deliveryPaid" className="text-sm font-semibold text-ds-on-surface-variant cursor-pointer select-none">
-                Delivery Charge Paid
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-ds-on-surface-variant">
+               Delivery Charge
+            </span>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isDeliveryPaid}
+                  onChange={(e) => setIsDeliveryPaid(e.target.checked)}
+                  className="w-4 h-4 rounded-full border-ds-outline-variant text-ds-primary focus:ring-ds-primary cursor-pointer"
+                  style={{ borderRadius: "50%" }}
+                />
+                <span className="text-[11px] font-bold text-ds-outline uppercase tracking-wider select-none">Paid</span>
               </label>
+              
+              {isDeliveryPaid ? (
+                <input
+                  type="text"
+                  value="PAID"
+                  disabled
+                  className="w-20 text-center border border-ds-outline-variant rounded-lg text-sm px-2 py-1.5 bg-ds-surface-container-low text-green-600 font-bold uppercase tracking-wider select-none"
+                />
+              ) : (
+                <input
+                  type="number"
+                  min="0"
+                  value={deliveryCharge || ""}
+                  onChange={(e) => setDeliveryCharge(Number(e.target.value))}
+                  placeholder="0"
+                  className="w-20 text-right border border-ds-outline-variant rounded-lg text-sm px-2 py-1.5 outline-none bg-ds-surface-container-low focus:border-ds-primary-container"
+                />
+              )}
             </div>
-            {isDeliveryPaid && (
-              <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 uppercase tracking-wider animate-in fade-in slide-in-from-right-2 duration-300">
-                <span className="material-symbols-outlined text-[14px]">payments</span>
-                Delivery Paid
-              </span>
-            )}
-         </div>
+          </div>
 
-         <div className="border-t border-ds-outline-variant pt-4 flex items-center justify-between">
-            <span className="text-sm font-black text-ds-on-surface uppercase tracking-tight">Total Amount</span>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-ds-on-surface-variant">Advance Payment</span>
+            <input
+              type="number"
+              min="0"
+              value={advanceAmount || ""}
+              onChange={(e) => setAdvanceAmount(Number(e.target.value))}
+              placeholder="0"
+              className="w-20 text-right border border-ds-outline-variant rounded-lg text-sm px-2 py-1.5 outline-none bg-ds-surface-container-low focus:border-ds-primary-container"
+            />
+          </div>
+
+          <div className="border-t border-ds-outline-variant pt-4 flex items-center justify-between">
+            <span className="text-sm font-black text-ds-primary uppercase tracking-wider">Grand Total</span>
             <span className="text-xl font-black text-ds-primary">৳{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-         </div>
+          </div>
 
 
-        <div className="pt-2">
-          <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Notes (Optional)</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Thank you for your business!"
-            rows={2}
-            className="w-full rounded-lg border px-3 py-2 text-sm resize-none bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container"
-          />
+          <div className="pt-2">
+            <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Thank you for your purchase!"
+              rows={2}
+              className="w-full rounded-lg border px-3 py-2 text-sm resize-none bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container"
+            />
+          </div>
         </div>
-      </div>
 
-      <div className="flex gap-2 pt-2">
-        <button 
-           onClick={() => setPreviewOpen(true)}
-           className="flex-[1] py-3.5 rounded-xl border border-ds-outline-variant text-ds-on-surface font-semibold text-sm active:scale-95 transition-transform"
-        >
-           Preview 
-        </button>
-        <button 
-           onClick={() => handleCreate(false)}
-           disabled={saving}
-           className="flex-[1.5] py-3.5 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center"
-        >
-           {saving ? "Saving..." : (editInvoice ? "Update" : "Save")}
-        </button>
-        <button 
-           onClick={() => handleCreate(true)}
-           disabled={saving}
-           className="flex-[1.5] py-3.5 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center gap-2"
-           style={{ background: "var(--ds-primary)" }}
-        >
-          {saving ? <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <span className="material-symbols-outlined text-lg">print</span>}
-          {saving ? "Saving..." : (editInvoice ? "Update & Print" : "Print")}
-        </button>
-      </div>
-      
-      {/* ── Preview Modal ── */}
-      {previewOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:hidden animate-in fade-in duration-200">
-          <div className="bg-ds-surface-container-lowest rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-4 border-b border-ds-outline-variant bg-ds-surface-container-lowest">
-              <h2 className="text-lg font-bold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>Invoice Preview</h2>
-              <button onClick={() => setPreviewOpen(false)} className="p-2 rounded-full hover:bg-ds-surface-container-high transition-colors text-ds-on-surface">
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 w-full">
-               <InvoiceTemplate
+        <div className="flex gap-2 pt-2">
+          <button
+            onClick={() => setPreviewOpen(true)}
+            className="flex-[1] py-3.5 rounded-xl border border-ds-outline-variant text-ds-on-surface font-semibold text-sm active:scale-95 transition-transform"
+          >
+            Preview
+          </button>
+          <button
+            onClick={() => handleCreate(false)}
+            disabled={saving}
+            className="flex-[1.5] py-3.5 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center"
+          >
+            {saving ? "Saving..." : (editInvoice ? "Update" : "Save")}
+          </button>
+          <button
+            onClick={() => handleCreate(true)}
+            disabled={saving}
+            className="flex-[1.5] py-3.5 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center gap-2"
+            style={{ background: "var(--ds-primary)" }}
+          >
+            {saving ? <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <span className="material-symbols-outlined text-lg">print</span>}
+            {saving ? "Saving..." : (editInvoice ? "Update & Print" : "Print")}
+          </button>
+        </div>
+
+        {/* ── Preview Modal ── */}
+        {previewOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 print:hidden animate-in fade-in duration-200">
+            <div className="bg-ds-surface-container-lowest rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between p-4 border-b border-ds-outline-variant bg-ds-surface-container-lowest">
+                <h2 className="text-lg font-bold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>Invoice Preview</h2>
+                <button onClick={() => setPreviewOpen(false)} className="p-2 rounded-full hover:bg-ds-surface-container-high transition-colors text-ds-on-surface">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 w-full">
+                <InvoiceTemplate
                   shopName={shop.name}
                   shopAddress={formatAddress(shop.address)}
                   shopPhone={shop.contactNumber || ""}
                   fbLink={shop.socialLinks?.facebook || ""}
                   igLink={shop.socialLinks?.instagram || ""}
                   footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
-                  invNumber={"INV-[AUTO]"}
-                  invDate={new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                  invNumber={editInvoice ? editInvoice.invoiceNumber : "INV-[AUTO]"}
+                  invDate={new Date(invoiceDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                   customerName={customerName || "Walk-in Customer"}
                   customerPhone={customerPhone}
                   customerEmail={customerEmail}
                   customerAddress={customerAddress}
-                  items={cart.map(c => ({ name: c.product.name, qty: c.quantity, price: c.product.price }))}
+                  items={cart.map(c => ({ name: c.variety ? `${c.product.name} (${c.variety})` : c.product.name, qty: c.quantity, price: c.product.price }))}
                   subtotal={subtotal}
                   discount={discountAmount}
                   advanceAmount={advanceAmount}
@@ -516,49 +531,49 @@ export function TabCreateInvoice({
                   isDeliveryPaid={isDeliveryPaid}
                   grandTotal={grandTotal}
                   notes={notes}
-               />
+                />
+              </div>
+
+              <div className="p-4 border-t border-ds-outline-variant bg-ds-surface-container-lowest flex gap-3">
+                <button
+                  onClick={() => { handleCreate(false); setPreviewOpen(false); }}
+                  disabled={saving || cart.length === 0}
+                  className="flex-[1] py-3 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex items-center justify-center"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => { handleCreate(true); setPreviewOpen(false); }}
+                  disabled={saving || cart.length === 0}
+                  className="flex-[1.5] py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center gap-2"
+                  style={{ background: "var(--ds-primary)" }}
+                >
+                  <span className="material-symbols-outlined text-[18px]">print</span>
+                  Print
+                </button>
+              </div>
             </div>
-
-            <div className="p-4 border-t border-ds-outline-variant bg-ds-surface-container-lowest flex gap-3">
-               <button 
-                 onClick={() => { handleCreate(false); setPreviewOpen(false); }}
-                 disabled={saving || cart.length === 0}
-                 className="flex-[1] py-3 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex items-center justify-center"
-               >
-                 Save
-               </button>
-               <button 
-                 onClick={() => { handleCreate(true); setPreviewOpen(false); }}
-                 disabled={saving || cart.length === 0}
-                 className="flex-[1.5] py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center gap-2"
-                 style={{ background: "var(--ds-primary)" }}
-               >
-                 <span className="material-symbols-outlined text-[18px]">print</span>
-                 Print
-               </button>
-             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
 
-    {/* ── Hidden Printable Invoice Template ── */}
-    <div className="hidden print:block fixed inset-0 z-[99999] bg-white text-black p-0 m-0 w-full min-h-screen">
-      <div className="max-w-xl mx-auto align-top">
-         <InvoiceTemplate
+      {/* ── Hidden Printable Invoice Template ── */}
+      <div className="hidden print:block absolute top-0 left-0 z-[99999] bg-white text-black p-0 m-0 w-full h-auto">
+        <div className="max-w-xl mx-auto align-top">
+          <InvoiceTemplate
             shopName={shop.name}
             shopAddress={formatAddress(shop.address)}
             shopPhone={shop.contactNumber || ""}
             fbLink={shop.socialLinks?.facebook || ""}
             igLink={shop.socialLinks?.instagram || ""}
             footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
-            invNumber={"INV-[AUTO]"}
+            invNumber={editInvoice ? editInvoice.invoiceNumber : "INV-[AUTO]"}
             invDate={new Date(invoiceDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
             customerName={customerName || "Walk-in Customer"}
             customerPhone={customerPhone}
             customerEmail={customerEmail}
             customerAddress={customerAddress}
-            items={cart.map(c => ({ name: c.product.name, qty: c.quantity, price: c.product.price }))}
+            items={cart.map(c => ({ name: c.variety ? `${c.product.name} (${c.variety})` : c.product.name, qty: c.quantity, price: c.product.price }))}
             subtotal={subtotal}
             discount={discountAmount}
             advanceAmount={advanceAmount}
@@ -566,9 +581,9 @@ export function TabCreateInvoice({
             isDeliveryPaid={isDeliveryPaid}
             grandTotal={grandTotal}
             notes={notes}
-         />
+          />
+        </div>
       </div>
-    </div>
     </>
   );
 }

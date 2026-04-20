@@ -1,20 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-// @ts-ignore
 import domtoimage from "dom-to-image-more";
 import { type ApiShop, type ApiInvoice, invoiceApi } from "../auth.utils";
 import { InvoiceTemplate } from "../components/InvoiceTemplate";
 
 function formatAddress(addr: ApiShop["address"]): string {
-  if (!addr) return "";
-  const parts = [
-    addr.address_line1,
-    addr.address_line2,
-    addr.city,
-    addr.state,
-    addr.postal_code,
-    addr.country,
-  ].filter(Boolean);
-  return parts.join(", ");
+  return addr?.address_line1 || "";
 }
 
 export function TabInvoiceHistory({
@@ -35,6 +25,8 @@ export function TabInvoiceHistory({
   const exportRef = useRef<HTMLDivElement>(null);
   const [exportingInvoice, setExportingInvoice] = useState<ApiInvoice | null>(null);
   const [isPrintingMultiple, setIsPrintingMultiple] = useState(false);
+  const longPressTimer = useRef<any>(null);
+  const [longPressedId, setLongPressedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (shop) {
@@ -42,13 +34,34 @@ export function TabInvoiceHistory({
     }
   }, [shop]);
 
+  const handlePressStart = (id: string) => {
+    longPressTimer.current = setTimeout(() => {
+      setLongPressedId(id);
+      setSelectedIds(prev =>
+        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+      );
+      // Add a tiny vibration if supported
+      if ('vibrate' in navigator) navigator.vibrate(50);
+    }, 500);
+  };
+
+  const handlePressEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+    // Delay clearing the longPressedId so the onClick can catch it
+    setTimeout(() => setLongPressedId(null), 10);
+  };
+
   const fetchInvoices = async () => {
     setLoading(true);
     try {
       const res = await invoiceApi.listInvoices(shop!._id);
-      const sorted = [...res.invoices].sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      const sorted = [...res.invoices].sort((a, b) => {
+        const timeA = parseInt(a._id.substring(0, 8), 16);
+        const timeB = parseInt(b._id.substring(0, 8), 16);
+        return timeB - timeA;
+      });
       setInvoices(sorted);
     } catch (err: any) {
       setToast({ msg: err.message || "Failed to load invoices", type: "error" });
@@ -82,14 +95,15 @@ export function TabInvoiceHistory({
 
       for (const inv of selectedInvoices) {
         setExportingInvoice(inv);
-        // Wait for state update and render
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for fonts and components to fully render
+        await new Promise(resolve => setTimeout(resolve, 400));
 
         if (exportRef.current) {
-          const dataUrl = await domtoimage.toPng(exportRef.current, {
+          // Use 'as any' to bypass the incomplete community type definitions
+          const dataUrl = await (domtoimage as any).toPng(exportRef.current, {
             quality: 1.0,
             bgcolor: "#ffffff",
-            width: 360,
+            width: 320,
           });
           const link = document.createElement("a");
           link.href = dataUrl;
@@ -165,8 +179,8 @@ export function TabInvoiceHistory({
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header - Locked/Sticky */}
+        <div className="sticky top-[-20px] z-20 bg-ds-background/95 backdrop-blur-sm -mx-4 px-4 py-3 flex items-center justify-between border-b border-ds-outline-variant/30 mb-2">
           <div>
             <h2 className="text-lg font-extrabold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>
               Invoice History
@@ -178,7 +192,7 @@ export function TabInvoiceHistory({
               <>
                 <button
                   onClick={handlePrintSelected}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-ds-outline-variant text-ds-on-surface text-[11px] font-bold active:scale-95 transition-all shadow-sm bg-ds-surface-container-low"
+                  className="h-10 flex items-center gap-1.5 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-[11px] font-bold active:scale-95 transition-all shadow-sm bg-ds-surface-container-low"
                 >
                   <span className="material-symbols-outlined text-base">print</span>
                   Print ({selectedIds.length})
@@ -186,7 +200,7 @@ export function TabInvoiceHistory({
                 <button
                   onClick={handleExportSelected}
                   disabled={isExporting}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ds-primary-container text-white text-[11px] font-bold active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+                  className="h-10 flex items-center gap-1.5 px-4 rounded-xl bg-ds-primary-container text-white text-[11px] font-bold active:scale-95 transition-all disabled:opacity-50 shadow-sm"
                 >
                   {isExporting ? (
                     <span className="h-3.5 w-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -199,7 +213,7 @@ export function TabInvoiceHistory({
             )}
             <button
               onClick={fetchInvoices}
-              className="p-2 rounded-xl bg-ds-surface-container-low text-ds-on-surface hover:bg-ds-surface-container-high border border-ds-outline-variant transition-colors"
+              className="h-10 w-10 flex items-center justify-center rounded-xl bg-ds-surface-container-low text-ds-on-surface hover:bg-ds-surface-container-high border border-ds-outline-variant transition-colors"
             >
               <span className={`material-symbols-outlined text-[20px] ${loading ? "animate-spin" : ""}`}>refresh</span>
             </button>
@@ -236,10 +250,27 @@ export function TabInvoiceHistory({
               return (
                 <div
                   key={inv._id}
-                  onClick={() => setPreviewInvoice(inv)}
-                  className={`p-4 rounded-xl border flex items-start gap-3 transition-all cursor-pointer hover:bg-ds-surface-container-high ${isSelected ? "border-ds-primary-container bg-ds-primary-container/5" : "border-ds-outline-variant bg-ds-surface-container-lowest"}`}
+                  onMouseDown={() => handlePressStart(inv._id)}
+                  onMouseUp={handlePressEnd}
+                  onMouseLeave={handlePressEnd}
+                  onTouchStart={() => handlePressStart(inv._id)}
+                  onTouchEnd={handlePressEnd}
+                  onClick={() => {
+                    if (longPressedId === inv._id) return;
+
+                    if (selectedIds.length > 0) {
+                      // If we are in "selection mode", regular tap toggles selection
+                      setSelectedIds(prev =>
+                        prev.includes(inv._id) ? prev.filter(i => i !== inv._id) : [...prev, inv._id]
+                      );
+                    } else {
+                      // Normal mode: regular tap opens preview
+                      setPreviewInvoice(inv);
+                    }
+                  }}
+                  className={`p-4 rounded-2xl border flex items-center gap-3 transition-all cursor-pointer select-none active:scale-[0.98] hover:shadow-sm ${isSelected ? "border-ds-primary-container bg-ds-primary-container/5" : "border-ds-outline-variant bg-ds-surface-container-lowest"}`}
                 >
-                  <div onClick={(e) => toggleSelect(inv._id, e)} className="pt-0.5">
+                  <div onClick={(e) => toggleSelect(inv._id, e)}>
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -248,42 +279,45 @@ export function TabInvoiceHistory({
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-sm font-extrabold text-ds-on-surface flex items-center gap-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
-                          #{inv.invoiceNumber}
-                          <span className="text-[10px] font-medium text-ds-outline bg-ds-surface-container-high px-1.5 py-0.5 rounded border border-ds-outline-variant/30">
-                            {new Date(inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                          </span>
+                    {/* Top Row: Invoice # + Badge (Left), Amount (Right) */}
+                    <div className="flex justify-between items-center mb-0.5">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-extrabold text-ds-on-surface" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                          {inv.invoiceNumber}
                         </h4>
-                        <p className="text-xs text-ds-on-surface-variant mt-1 font-medium">{inv.customerName || "Walk-in Customer"}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-sm font-extrabold text-ds-primary block">
-                          ৳{inv.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                        <span
+                          className="text-[10px] font-bold uppercase px-2 py-0.5 rounded tracking-wide"
+                          style={{ background: colors.bg, color: colors.text }}
+                        >
+                          {inv.status}
                         </span>
                       </div>
+                      <span className="text-[15px] font-extrabold text-ds-primary text-right">
+                        ৳{inv.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
 
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-ds-outline-variant/30">
-                      <span
-                        className="flex items-center gap-1.5 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full tracking-widest border"
-                        style={{ background: colors.bg, color: colors.text, borderColor: colors.text + '30' }}
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: colors.text }} />
-                        {inv.status}
-                      </span>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartEdit(inv);
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ds-surface-container-high text-ds-primary hover:bg-ds-primary hover:text-white transition-all active:scale-95 border border-ds-outline-variant/50"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">edit_square</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Edit</span>
-                      </button>
+                    {/* Middle Row: Customer + Date (Left), Edit Pencil (Right) */}
+                    <div className="flex justify-between items-center mt-1">
+                      <div className="flex items-center gap-2 truncate">
+                        <p className="text-xs text-ds-on-surface-variant font-medium uppercase truncate">
+                          {inv.customerName || "Walk-in Customer"}
+                        </p>
+                        <span className="text-[11px] font-medium text-ds-outline flex-shrink-0">
+                          • {new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <div className="flex justify-end flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartEdit(inv);
+                          }}
+                          className="p-1 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors -mr-1 relative z-10"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -294,47 +328,84 @@ export function TabInvoiceHistory({
       </div>
 
       {/* Off-screen Capture Area */}
-      <div className="fixed top-0 left-[-9999px] pointer-events-none" style={{ width: "400px" }}>
-        <div ref={exportRef} id="export-container" style={{ width: "360px", background: "white" }}>
+      <div className="fixed top-0 left-[-9999px] pointer-events-none" style={{ width: "320px" }}>
+        <div ref={exportRef} id="export-container" style={{ width: "320px", background: "#ffffff" }}>
           <style>{`
+  /* Import fonts for the capture context */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+  /* Ultra-Tight Digital Export Styling */
+  #export-container {
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    width: 320px !important;
+    font-family: 'Inter', sans-serif !important;
+    -webkit-font-smoothing: antialiased;
+  }
+  
   #export-container * {
+    border: none !important;
+    outline: none !important;
     box-shadow: none !important;
-    border-color: transparent !important;
+    text-rendering: optimizeLegibility !important;
   }
-  #export-container div:not(.bg-force),
-  #export-container p,
-  #export-container span,
-  #export-container label {
-    background-color: transparent !important;
+
+  /* Target the main card container precisely */
+  #export-container > div > div {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important;
+    margin: 4px !important;
   }
+
+  /* Restore teal header branding */
   #export-container .bg-force {
-    background-color: inherit !important;
+    background-color: #005C72 !important;
+    padding: 16px 8px !important; 
+  }
+
+  #export-container h3 {
+    font-family: 'Manrope', sans-serif !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.01em !important;
+  }
+  
+  /* Precision Dashed Lines */
+  #export-container div[style*="border-bottom"],
+  #export-container div[style*="border-top"] {
+     border-bottom: 1px dashed #cbd5e1 !important; 
+     border-radius: 0 !important;
+  }
+
+  /* Restore Grand Total box */
+  #export-container .border-black {
+    border: 1px dashed #000000 !important;
+    border-radius: 8px !important;
+  }
+
+  #export-container p, #export-container span {
+    font-family: 'Inter', sans-serif !important;
   }
 `}</style>
           {exportingInvoice && (
-            <div style={{ backgroundColor: "#ffffff", padding: "20px" }}>
+            <div style={{ backgroundColor: "#ffffff", padding: "0px" }}>
               <InvoiceTemplate
                 shopName={shop.name}
                 shopAddress={formatAddress(shop.address)}
-                shopPhone={shop.contactNumber || ""}
-                fbLink={shop.socialLinks?.facebook || ""}
-                igLink={shop.socialLinks?.instagram || ""}
-                footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
-                invNumber={exportingInvoice.invoiceNumber}
-                invDate={new Date(exportingInvoice.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                customerName={exportingInvoice.customerName || "Walk-in Customer"}
+                shopPhone={(shop as any).contact_number}
+                invoiceNumber={exportingInvoice.invoiceNumber}
+                invoiceDate={new Date(exportingInvoice.invoiceDate || exportingInvoice.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                customerName={exportingInvoice.customerName}
                 customerPhone={exportingInvoice.customerPhone}
-                customerEmail={exportingInvoice.customerEmail}
                 customerAddress={exportingInvoice.customerAddress}
-                items={exportingInvoice.items.map(c => ({ name: c.name, qty: c.quantity, price: c.unitPrice }))}
-                subtotal={exportingInvoice.subtotal}
+                items={exportingInvoice.items || []}
+                subTotal={exportingInvoice.subtotal}
                 discount={exportingInvoice.discountAmount}
-                advanceAmount={exportingInvoice.advanceAmount}
                 deliveryCharge={exportingInvoice.deliveryCharge}
+                advancePayment={exportingInvoice.advanceAmount}
                 isDeliveryPaid={exportingInvoice.isDeliveryPaid}
                 grandTotal={exportingInvoice.grandTotal}
                 notes={exportingInvoice.notes}
-                noShadow={true}
+                noShadow={false}
               />
             </div>
           )}
@@ -363,7 +434,7 @@ export function TabInvoiceHistory({
                 igLink={shop.socialLinks?.instagram || ""}
                 footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
                 invNumber={previewInvoice.invoiceNumber}
-                invDate={new Date(previewInvoice.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                invDate={new Date(previewInvoice.invoiceDate || previewInvoice.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                 customerName={previewInvoice.customerName || "Walk-in Customer"}
                 customerPhone={previewInvoice.customerPhone}
                 customerEmail={previewInvoice.customerEmail}
@@ -420,7 +491,7 @@ export function TabInvoiceHistory({
               igLink={shop.socialLinks?.instagram || ""}
               footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
               invNumber={previewInvoice.invoiceNumber}
-              invDate={new Date(previewInvoice.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+              invDate={new Date(previewInvoice.invoiceDate || previewInvoice.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
               customerName={previewInvoice.customerName || "Walk-in Customer"}
               customerPhone={previewInvoice.customerPhone}
               customerEmail={previewInvoice.customerEmail}
@@ -454,7 +525,7 @@ export function TabInvoiceHistory({
                     igLink={shop.socialLinks?.instagram || ""}
                     footerText={shop.receiptConfig?.footerText || "Thank you for your purchase!"}
                     invNumber={inv.invoiceNumber}
-                    invDate={new Date(inv.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                    invDate={new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                     customerName={inv.customerName || "Walk-in Customer"}
                     customerPhone={inv.customerPhone}
                     customerEmail={inv.customerEmail}
