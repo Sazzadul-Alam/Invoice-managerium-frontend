@@ -207,7 +207,7 @@ export function TabInvoiceHistory({
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={fetchInvoices}
+                onClick={() => fetchInvoices()}
                 className="h-9 w-9 flex items-center justify-center rounded-xl bg-ds-surface-container-low text-ds-on-surface hover:bg-ds-surface-container-high border border-ds-outline-variant transition-colors"
                 title="Refresh List"
               >
