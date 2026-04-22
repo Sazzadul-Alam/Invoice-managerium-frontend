@@ -21,6 +21,13 @@ export function TabInvoiceHistory({
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
+  // Pagination & Filtering
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [filterDate, setFilterDate] = useState("");
+  const limit = 10; 
+
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -31,9 +38,17 @@ export function TabInvoiceHistory({
 
   useEffect(() => {
     if (shop) {
-      fetchInvoices();
+      setCurrentPage(1);
+      fetchInvoices(1, filterDate);
     }
-  }, [shop]);
+  }, [shop, filterDate]);
+
+  useEffect(() => {
+    if (shop) {
+      fetchInvoices(currentPage, filterDate);
+    }
+  }, [currentPage]);
+
 
   const handlePressStart = (id: string) => {
     longPressTimer.current = setTimeout(() => {
@@ -54,16 +69,14 @@ export function TabInvoiceHistory({
     setTimeout(() => setLongPressedId(null), 10);
   };
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = async (page = currentPage, date = filterDate) => {
+    if (!shop) return;
     setLoading(true);
     try {
-      const res = await invoiceApi.listInvoices(shop!._id);
-      const sorted = [...res.invoices].sort((a, b) => {
-        const timeA = parseInt(a._id.substring(0, 8), 16);
-        const timeB = parseInt(b._id.substring(0, 8), 16);
-        return timeB - timeA;
-      });
-      setInvoices(sorted);
+      const res = await invoiceApi.listInvoices(shop._id, page, limit, date);
+      // Backend returns total items, calculate total pages
+      setInvoices(res.invoices);
+      setTotalPages(Math.ceil((res.total || 0) / limit));
     } catch (err: any) {
       setToast({ msg: err.message || "Failed to load invoices", type: "error" });
       setTimeout(() => setToast(null), 3000);
@@ -104,7 +117,8 @@ export function TabInvoiceHistory({
           const dataUrl = await (domtoimage as any).toPng(exportRef.current, {
             quality: 1.0,
             bgcolor: "#ffffff",
-            width: 360, // Increased for breathing room
+            width: 360, // Tightened to remove horizontal gaps
+            scale: 4, // 4x Resolution (High Definition)
           });
           const link = document.createElement("a");
           link.href = dataUrl;
@@ -181,46 +195,75 @@ export function TabInvoiceHistory({
           </div>
         )}
 
-        {/* Header - Locked/Sticky */}
-        <div className="sticky top-[-20px] z-20 bg-ds-background/95 backdrop-blur-sm -mx-4 px-4 py-3 flex items-center justify-between border-b border-ds-outline-variant/30 mb-2">
-          <div>
-            <h2 className="text-lg font-extrabold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>
-              Invoice History
-            </h2>
-            <p className="text-xs text-ds-outline">All generated invoices</p>
+        {/* Header - Staked 2-Row Layout for Mobile */}
+        <div className="sticky top-[-20px] z-20 bg-ds-background/95 backdrop-blur-sm -mx-4 px-4 py-3 border-b border-ds-outline-variant/30 space-y-3 shadow-sm">
+          {/* Row 1: Title & Actions */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-extrabold text-ds-primary leading-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                Invoices
+              </h2>
+              <p className="text-[10px] text-ds-outline font-bold uppercase tracking-tighter">Inventory History</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchInvoices}
+                className="h-9 w-9 flex items-center justify-center rounded-xl bg-ds-surface-container-low text-ds-on-surface hover:bg-ds-surface-container-high border border-ds-outline-variant transition-colors"
+                title="Refresh List"
+              >
+                <span className={`material-symbols-outlined text-[18px] ${loading ? "animate-spin" : ""}`}>refresh</span>
+              </button>
+            </div>
           </div>
+
+          {/* Row 2: Date Filter & Multi-Select Buttons */}
           <div className="flex items-center gap-2">
+            {/* Date Filter - Takes available space */}
+            <div className="flex-1 relative flex items-center h-9 px-3 rounded-xl border border-ds-outline-variant bg-ds-surface-container-lowest focus-within:border-ds-primary/30 transition-all shadow-sm">
+              <span className="material-symbols-outlined text-[16px] text-ds-outline mr-2">calendar_today</span>
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="bg-transparent border-none outline-none text-[11px] font-bold text-ds-on-surface w-full"
+              />
+              {filterDate && (
+                <button onClick={() => setFilterDate("")} className="ml-1 text-ds-outline hover:text-ds-error">
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              )}
+            </div>
+
+            {/* Selection Buttons - Appear only when items selected */}
             {selectedIds.length > 0 && (
-              <>
+              <div className="flex items-center gap-1.5 animate-in slide-in-from-right-2 duration-200">
                 <button
                   onClick={handlePrintSelected}
-                  className="h-10 flex items-center gap-1.5 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-[11px] font-bold active:scale-95 transition-all shadow-sm bg-ds-surface-container-low"
+                  className="h-9 w-9 flex items-center justify-center rounded-xl border border-ds-outline-variant text-ds-on-surface bg-ds-surface-container-low active:scale-95 transition-all shadow-sm"
+                  title={`Print ${selectedIds.length} invoices`}
                 >
-                  <span className="material-symbols-outlined text-base">print</span>
-                  Print ({selectedIds.length})
+                  <span className="material-symbols-outlined text-[18px]">print</span>
                 </button>
                 <button
                   onClick={handleExportSelected}
                   disabled={isExporting}
-                  className="h-10 flex items-center gap-1.5 px-4 rounded-xl bg-ds-primary-container text-white text-[11px] font-bold active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+                  className="h-9 w-9 flex items-center justify-center rounded-xl bg-ds-primary-container text-white active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+                  title={`Export ${selectedIds.length} invoices`}
                 >
                   {isExporting ? (
-                    <span className="h-3.5 w-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <span className="material-symbols-outlined text-base">download</span>
+                    <span className="material-symbols-outlined text-[18px]">download</span>
                   )}
-                  Save ({selectedIds.length})
                 </button>
-              </>
+                <div className="h-9 px-2 flex items-center justify-center rounded-lg bg-ds-primary/10 text-ds-primary text-[10px] font-black">
+                  {selectedIds.length}
+                </div>
+              </div>
             )}
-            <button
-              onClick={fetchInvoices}
-              className="h-10 w-10 flex items-center justify-center rounded-xl bg-ds-surface-container-low text-ds-on-surface hover:bg-ds-surface-container-high border border-ds-outline-variant transition-colors"
-            >
-              <span className={`material-symbols-outlined text-[20px] ${loading ? "animate-spin" : ""}`}>refresh</span>
-            </button>
           </div>
         </div>
+
 
 
 
@@ -327,7 +370,33 @@ export function TabInvoiceHistory({
             })}
           </div>
         )}
+
+        {/* Pagination bar - Sticky Bottom mobile style */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-between py-4 border-t border-ds-outline-variant/30 mt-4">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="h-9 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-xs font-bold disabled:opacity-30 active:scale-95 transition-all bg-ds-surface-container-low flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-sm">chevron_left</span>
+              Prev
+            </button>
+            <div className="text-[11px] font-black text-ds-outline uppercase tracking-widest">
+              Page <span className="text-ds-primary">{currentPage}</span> of {totalPages}
+            </div>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              className="h-9 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-xs font-bold disabled:opacity-30 active:scale-95 transition-all bg-ds-surface-container-low flex items-center gap-1"
+            >
+              Next
+              <span className="material-symbols-outlined text-sm">chevron_right</span>
+            </button>
+          </div>
+        )}
       </div>
+
 
       {/* Off-screen Capture Area */}
       <div className="fixed top-0 left-[-9999px] pointer-events-none" style={{ width: "360px" }}>
@@ -338,7 +407,7 @@ export function TabInvoiceHistory({
 
   /* Ultra-Tight Digital Export Styling */
   #export-container {
-    padding: 20px !important;
+    padding: 12px 0px !important; /* Kept top spacing, removed side padding */
     background-color: #ffffff !important;
     width: 360px !important;
     display: flex !important;
@@ -357,9 +426,10 @@ export function TabInvoiceHistory({
 
   /* Target the main card container precisely */
   #export-container > div > div {
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 16px !important;
-    margin: 4px !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 16px !important; /* Restored rounded look */
   }
 
   /* Restore teal header branding */
@@ -393,10 +463,10 @@ export function TabInvoiceHistory({
 `}</style>
           {exportingInvoice && (
             <div style={{ backgroundColor: "#ffffff", padding: "0px" }}>
-              <InvoiceWrapper 
-                shop={shop} 
-                invoice={exportingInvoice} 
-                noShadow={false} 
+              <InvoiceWrapper
+                shop={shop}
+                invoice={exportingInvoice}
+                noShadow={false}
               />
             </div>
           )}
@@ -411,15 +481,15 @@ export function TabInvoiceHistory({
               <h2 className="text-lg font-bold text-ds-primary" style={{ fontFamily: "'Manrope', sans-serif" }}>
                 Invoice #{previewInvoice.invoiceNumber}
               </h2>
-            <button onClick={() => setPreviewInvoice(null)} className="p-2 rounded-full hover:bg-ds-surface-container-high transition-colors text-ds-on-surface">
+              <button onClick={() => setPreviewInvoice(null)} className="p-2 rounded-full hover:bg-ds-surface-container-high transition-colors text-ds-on-surface">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 w-full">
-              <InvoiceWrapper 
-                shop={shop} 
-                invoice={previewInvoice} 
+              <InvoiceWrapper
+                shop={shop}
+                invoice={previewInvoice}
               />
             </div>
 
@@ -456,10 +526,10 @@ export function TabInvoiceHistory({
       {previewInvoice && (
         <div className="hidden print:block fixed inset-0 z-[99999] bg-white text-black p-0 m-0 w-full min-h-screen">
           <div className="max-w-xl mx-auto align-top">
-            <InvoiceWrapper 
-              shop={shop} 
-              invoice={previewInvoice} 
-              noShadow 
+            <InvoiceWrapper
+              shop={shop}
+              invoice={previewInvoice}
+              noShadow
             />
           </div>
         </div>
@@ -472,17 +542,17 @@ export function TabInvoiceHistory({
             {invoices
               .filter((inv) => selectedIds.includes(inv._id))
               .map((inv, index) => (
-                <div 
-                  key={inv._id} 
-                  style={{ 
-                    breakAfter: "always", 
+                <div
+                  key={inv._id}
+                  style={{
+                    breakAfter: "always",
                     pageBreakAfter: "always",
-                    paddingBottom: "2rem" 
+                    paddingBottom: "2rem"
                   }}
                 >
-                  <InvoiceWrapper 
-                    shop={shop} 
-                    invoice={inv} 
+                  <InvoiceWrapper
+                    shop={shop}
+                    invoice={inv}
                     noShadow
                   />
                 </div>

@@ -283,7 +283,13 @@ export function TabCreateInvoice({
             </div>
             <div className="col-span-2">
               <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Address</label>
-              <input type="text" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder="e.g. 123 Street, Dhaka" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
+              <textarea
+                value={customerAddress}
+                onChange={e => setCustomerAddress(e.target.value)}
+                placeholder="e.g. 123 Street, Dhaka"
+                rows={2}
+                className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container resize-none"
+              />
             </div>
           </div>
         </div>

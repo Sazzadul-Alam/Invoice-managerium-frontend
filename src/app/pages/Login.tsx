@@ -47,14 +47,14 @@ export function Login() {
           <div className="text-center mb-10">
             <img
               src="/invoice_logo.png"
-              alt="Invoice Managerium logo"
+              alt={`${import.meta.env.VITE_APP_NAME || "Invoice Managerium"} logo`}
               className="w-26 h-26 object-contain drop-shadow-md mx-auto mb-2"
             />
             <h1
               className="text-3xl font-extrabold tracking-tight text-ds-on-surface mb-2"
               style={{ fontFamily: "'Manrope', sans-serif" }}
             >
-              Invoice Managerium
+              {import.meta.env.VITE_APP_NAME || "Invoice Managerium"}
             </h1>
             <p className="text-ds-on-surface-variant font-medium text-sm">
               Secure Professional Invoice Manager

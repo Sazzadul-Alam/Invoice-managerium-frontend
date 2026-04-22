@@ -877,10 +877,13 @@ export const invoiceApi = {
       { status }
     ),
 
-  listInvoices: (shopId: string, page = 1, limit = 20) =>
-    authedGet<{ success: boolean; invoices: ApiInvoice[]; total: number }>(
-      `${INVOICE_BASE}/shop/${shopId}?page=${page}&limit=${limit}`
-    ),
+  listInvoices: (shopId: string, page = 1, limit = 20, date?: string) => {
+    const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (date) query.set("date", date);
+    return authedGet<{ success: boolean; invoices: ApiInvoice[]; total: number }>(
+      `${INVOICE_BASE}/shop/${shopId}?${query.toString()}`
+    );
+  },
 
   deleteInvoice: (shopId: string, invoiceId: string) =>
     authedDelete<{ success: boolean; message: string }>(
