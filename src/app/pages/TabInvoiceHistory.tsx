@@ -33,8 +33,7 @@ export function TabInvoiceHistory({
   const exportRef = useRef<HTMLDivElement>(null);
   const [exportingInvoice, setExportingInvoice] = useState<ApiInvoice | null>(null);
   const [isPrintingMultiple, setIsPrintingMultiple] = useState(false);
-  const longPressTimer = useRef<any>(null);
-  const [longPressedId, setLongPressedId] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (shop) {
@@ -50,24 +49,7 @@ export function TabInvoiceHistory({
   }, [currentPage]);
 
 
-  const handlePressStart = (id: string) => {
-    longPressTimer.current = setTimeout(() => {
-      setLongPressedId(id);
-      setSelectedIds(prev =>
-        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-      );
-      // Add a tiny vibration if supported
-      if ('vibrate' in navigator) navigator.vibrate(50);
-    }, 500);
-  };
 
-  const handlePressEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
-    // Delay clearing the longPressedId so the onClick can catch it
-    setTimeout(() => setLongPressedId(null), 10);
-  };
 
   const fetchInvoices = async (page = currentPage, date = filterDate) => {
     if (!shop) return;
@@ -295,16 +277,9 @@ export function TabInvoiceHistory({
               return (
                 <div
                   key={inv._id}
-                  onMouseDown={() => handlePressStart(inv._id)}
-                  onMouseUp={handlePressEnd}
-                  onMouseLeave={handlePressEnd}
-                  onTouchStart={() => handlePressStart(inv._id)}
-                  onTouchEnd={handlePressEnd}
                   onClick={() => {
-                    if (longPressedId === inv._id) return;
-
                     if (selectedIds.length > 0) {
-                      // If we are in "selection mode", regular tap toggles selection
+                      // If we are in "selection mode" (any checkbox checked), regular tap toggles selection
                       setSelectedIds(prev =>
                         prev.includes(inv._id) ? prev.filter(i => i !== inv._id) : [...prev, inv._id]
                       );
