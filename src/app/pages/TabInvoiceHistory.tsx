@@ -25,7 +25,7 @@ export function TabInvoiceHistory({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [filterDate, setFilterDate] = useState("");
-  const limit = 10; 
+  const limit = 10;
 
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -499,7 +499,7 @@ export function TabInvoiceHistory({
 
       {/* ── Hidden Printable Template ── */}
       {previewInvoice && (
-        <div className="hidden print:block fixed inset-0 z-[99999] bg-white text-black p-0 m-0 w-full min-h-screen">
+        <div className="hidden print:block absolute top-0 left-0 z-[99999] bg-white text-black p-0 m-0 w-full">
           <div className="max-w-xl mx-auto align-top">
             <InvoiceWrapper
               shop={shop}
@@ -512,17 +512,19 @@ export function TabInvoiceHistory({
 
       {/* ── Multiple Print Template ── */}
       {isPrintingMultiple && (
-        <div className="hidden print:block fixed inset-0 z-[99999] bg-white text-black p-0 m-0 w-full min-h-screen">
-          <div className="max-w-xl mx-auto space-y-10 py-10">
+        <div className="hidden print:block absolute top-0 left-0 z-[99999] bg-white text-black p-0 m-0 w-full">
+          <div className="max-w-xl mx-auto py-0">
             {invoices
               .filter((inv) => selectedIds.includes(inv._id))
-              .map((inv, index) => (
+              .map((inv) => (
                 <div
                   key={inv._id}
                   style={{
-                    breakAfter: "always",
                     pageBreakAfter: "always",
-                    paddingBottom: "2rem"
+                    breakAfter: "page",
+                    display: "block",
+                    width: "100%",
+                    marginBottom: "20px"
                   }}
                 >
                   <InvoiceWrapper
