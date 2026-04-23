@@ -538,7 +538,9 @@ function TabBuyPlan({
         </div>
       )} */}
 
-      {plans.map((plan) => {
+      {plans
+        .filter((p) => (currentPlanSlug === "free" ? p.isActive : true))
+        .map((plan) => {
         const isCurrent = plan.slug === currentPlanSlug;
         const color = planColor(plan.slug);
         const bg = planBg(plan.slug);
