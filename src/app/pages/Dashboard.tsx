@@ -541,159 +541,158 @@ function TabBuyPlan({
       {plans
         .filter((p) => (currentPlanSlug === "free" ? p.isActive : true))
         .map((plan) => {
-        const isCurrent = plan.slug === currentPlanSlug;
-        const color = planColor(plan.slug);
-        const bg = planBg(plan.slug);
-        const border = planBorder(plan.slug);
-        const features = planFeatures(plan);
+          const isCurrent = plan.slug === currentPlanSlug;
+          const color = planColor(plan.slug);
+          const bg = planBg(plan.slug);
+          const border = planBorder(plan.slug);
+          const features = planFeatures(plan);
 
-        return (
-          <div
-            key={plan._id}
-            className="rounded-2xl border p-5 transition-all"
-            style={{
-              background: bg,
-              borderColor: border,
-              borderWidth: isCurrent ? 1 : plan.slug === "starter" ? 2 : 1,
-            }}
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <span
-                  className="text-lg font-extrabold"
-                  style={{ color, fontFamily: "'Manrope', sans-serif" }}
-                >
-                  {plan.name}
-                </span>
-                {isCurrent && (
+          return (
+            <div
+              key={plan._id}
+              className="rounded-2xl border p-5 transition-all"
+              style={{
+                background: bg,
+                borderColor: border,
+                borderWidth: isCurrent ? 1 : plan.slug === "starter" ? 2 : 1,
+              }}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
                   <span
-                    className="ml-2 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                    style={{
-                      background: "var(--ds-surface-container-high)",
-                      color: "var(--ds-outline)",
-                    }}
+                    className="text-lg font-extrabold"
+                    style={{ color, fontFamily: "'Manrope', sans-serif" }}
                   >
-                    Active
+                    {plan.name}
                   </span>
-                )}
-              </div>
-              <div className="text-right">
-                {plan.price === 0 ? (
-                  <span className="text-xl font-bold" style={{ color }}>
-                    Free
-                  </span>
-                ) : (
-                  <div>
+                  {isCurrent && (
+                    <span
+                      className="ml-2 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                      style={{
+                        background: "var(--ds-surface-container-high)",
+                        color: "var(--ds-outline)",
+                      }}
+                    >
+                      Active
+                    </span>
+                  )}
+                </div>
+                <div className="text-right">
+                  {plan.price === 0 ? (
                     <span className="text-xl font-bold" style={{ color }}>
-                      ৳{activeCycle ? Math.max(0, (plan.price * activeCycle.durationInMonths) - activeCycle.discountAmount) : plan.price}
+                      Free
                     </span>
-                    <span className="text-xs text-ds-outline">
-                      /{activeCycle ? activeCycle.name.toLowerCase() : "mo"}
-                    </span>
-                  </div>
-                )}
+                  ) : (
+                    <div>
+                      <span className="text-xl font-bold" style={{ color }}>
+                        ৳{activeCycle ? Math.max(0, (plan.price * activeCycle.durationInMonths) - activeCycle.discountAmount) : plan.price}
+                      </span>
+                      <span className="text-xs text-ds-outline">
+                        /{activeCycle ? activeCycle.name.toLowerCase() : "mo"}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {plan.description && (
+                <p className="text-xs text-ds-on-surface-variant mb-3">{plan.description}</p>
+              )}
+
+              <ul className="space-y-1.5 mb-4">
+                {features.map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-xs text-ds-on-surface-variant">
+                    <span
+                      className="material-symbols-outlined text-sm"
+                      style={{ fontVariationSettings: "'FILL' 1", color }}
+                    >
+                      check_circle
+                    </span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              {!isCurrent && selectedPlanId !== plan._id && (
+                <button
+                  onClick={() => plan.slug !== "enterprise" && setSelectedPlanId(plan._id)}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] text-white"
+                  style={{ background: color }}
+                >
+                  {plan.slug === "enterprise" ? "Contact Us" : "Upgrade"} →
+                </button>
+              )}
+
+              {!isCurrent && selectedPlanId === plan._id && (
+                <div className="mt-4 p-4 rounded-xl border" style={{ borderColor: color, background: "var(--ds-surface-container-lowest)" }}>
+                  <p className="text-xs text-ds-on-surface-variant mb-3 font-semibold leading-relaxed">
+                    {plan.description}
+                  </p>
+                  <div className="p-3 mb-4 rounded-lg text-xs" style={{ background: "rgba(232,167,53,0.1)", border: "1px solid rgba(232,167,53,0.3)" }}>
+                    <p className="font-semibold text-ds-on-surface mb-1">To continue, please send money to:</p>
+                    <p className="text-ds-on-surface-variant font-medium">• bKash: 01976373291</p>
+                    <p className="text-ds-on-surface-variant font-medium mt-1">and provide the transaction details below.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-1">Mobile Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 017..."
+                        value={mobileNumber}
+                        onChange={(e) => setMobileNumber(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                        style={{ borderColor: "var(--ds-outline-variant)", background: "var(--ds-surface-container-highest)" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-1">Transaction ID</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. TRXR123456"
+                        value={transactionId}
+                        onChange={(e) => setTransactionId(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                        style={{ borderColor: "var(--ds-outline-variant)", background: "var(--ds-surface-container-highest)" }}
+                      />
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={() => setSelectedPlanId(null)}
+                        className="flex-1 py-2 rounded-lg text-xs font-bold transition-all border"
+                        style={{ borderColor: "var(--ds-outline)", color: "var(--ds-outline)" }}
+                        disabled={loadingPurchase}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handlePurchase(plan)}
+                        className="flex-[2] py-2 rounded-lg text-xs font-bold transition-all text-white flex items-center justify-center gap-2"
+                        style={{ background: color, opacity: loadingPurchase ? 0.7 : 1 }}
+                        disabled={loadingPurchase}
+                      >
+                        {loadingPurchase ? "Submitting..." : "Submit Payment"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isCurrent && (
+                <div
+                  className="text-center text-xs font-semibold py-2 rounded-xl"
+                  style={{
+                    color: "var(--ds-outline)",
+                    background: "var(--ds-surface-container)",
+                  }}
+                >
+                  Current plan
+                </div>
+              )}
             </div>
-
-            {plan.description && (
-              <p className="text-xs text-ds-on-surface-variant mb-3">{plan.description}</p>
-            )}
-
-            <ul className="space-y-1.5 mb-4">
-              {features.map((f) => (
-                <li key={f} className="flex items-center gap-2 text-xs text-ds-on-surface-variant">
-                  <span
-                    className="material-symbols-outlined text-sm"
-                    style={{ fontVariationSettings: "'FILL' 1", color }}
-                  >
-                    check_circle
-                  </span>
-                  {f}
-                </li>
-              ))}
-            </ul>
-
-            {!isCurrent && selectedPlanId !== plan._id && (
-              <button
-                onClick={() => plan.slug !== "enterprise" && setSelectedPlanId(plan._id)}
-                className="w-full py-2.5 rounded-xl text-sm font-bold transition-all active:scale-[0.98] text-white"
-                style={{ background: color }}
-              >
-                {plan.slug === "enterprise" ? "Contact Us" : "Upgrade"} →
-              </button>
-            )}
-
-            {!isCurrent && selectedPlanId === plan._id && (
-              <div className="mt-4 p-4 rounded-xl border" style={{ borderColor: color, background: "var(--ds-surface-container-lowest)" }}>
-                <p className="text-xs text-ds-on-surface-variant mb-3 font-semibold leading-relaxed">
-                  {plan.description}
-                </p>
-                <div className="p-3 mb-4 rounded-lg text-xs" style={{ background: "rgba(232,167,53,0.1)", border: "1px solid rgba(232,167,53,0.3)" }}>
-                  <p className="font-semibold text-ds-on-surface mb-1">To continue, please send money to:</p>
-                  <p className="text-ds-on-surface-variant font-medium">• bKash: 01732570221</p>
-                  <p className="text-ds-on-surface-variant font-medium">• Bank Account: 1444444444</p>
-                  <p className="text-ds-on-surface-variant font-medium mt-1">and provide the transaction details below.</p>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-1">Mobile Number</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 017..."
-                      value={mobileNumber}
-                      onChange={(e) => setMobileNumber(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
-                      style={{ borderColor: "var(--ds-outline-variant)", background: "var(--ds-surface-container-highest)" }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-1">Transaction ID</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. TRXR123456"
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border text-sm focus:outline-none"
-                      style={{ borderColor: "var(--ds-outline-variant)", background: "var(--ds-surface-container-highest)" }}
-                    />
-                  </div>
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => setSelectedPlanId(null)}
-                      className="flex-1 py-2 rounded-lg text-xs font-bold transition-all border"
-                      style={{ borderColor: "var(--ds-outline)", color: "var(--ds-outline)" }}
-                      disabled={loadingPurchase}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => handlePurchase(plan)}
-                      className="flex-[2] py-2 rounded-lg text-xs font-bold transition-all text-white flex items-center justify-center gap-2"
-                      style={{ background: color, opacity: loadingPurchase ? 0.7 : 1 }}
-                      disabled={loadingPurchase}
-                    >
-                      {loadingPurchase ? "Submitting..." : "Submit Payment"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isCurrent && (
-              <div
-                className="text-center text-xs font-semibold py-2 rounded-xl"
-                style={{
-                  color: "var(--ds-outline)",
-                  background: "var(--ds-surface-container)",
-                }}
-              >
-                Current plan
-              </div>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
 
       {toast && (
         <div
