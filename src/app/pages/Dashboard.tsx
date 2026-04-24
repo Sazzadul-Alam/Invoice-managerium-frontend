@@ -13,76 +13,17 @@ import {
 } from "../auth.utils";
 import { ProductManagement } from "./ProductManagement";
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  Demo data (Products only — real product API is Phase 3)                  */
-/* ────────────────────────────────────────────────────────────────────────── */
 
-const DEMO_PRODUCTS = [
-  {
-    id: 1,
-    name: "Premium Wireless Headphones",
-    category: "Electronics",
-    price: 2499,
-    buyingPrice: 1800,
-    stock: 12,
-    status: "active",
-    emoji: "🎧",
-  },
-  {
-    id: 2,
-    name: "Leather Executive Wallet",
-    category: "Accessories",
-    price: 899,
-    buyingPrice: 450,
-    stock: 28,
-    status: "active",
-    emoji: "👜",
-  },
-  {
-    id: 3,
-    name: "Ergonomic Desk Chair",
-    category: "Furniture",
-    price: 9500,
-    buyingPrice: 6200,
-    stock: 4,
-    status: "active",
-    emoji: "🪑",
-  },
-  {
-    id: 4,
-    name: "Stainless Steel Water Bottle",
-    category: "Lifestyle",
-    price: 650,
-    buyingPrice: 280,
-    stock: 60,
-    status: "active",
-    emoji: "🧴",
-  },
-  {
-    id: 5,
-    name: "Mechanical Gaming Keyboard",
-    category: "Electronics",
-    price: 3800,
-    buyingPrice: 2500,
-    stock: 0,
-    status: "inactive",
-    emoji: "⌨️",
-  },
-];
-
-const DEMO_INVOICE_ITEMS = [
-  { name: "Premium Wireless Headphones", qty: 1, price: 2499 },
-  { name: "Stainless Steel Water Bottle", qty: 2, price: 650 },
-];
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Tabs                                                                     */
 /* ────────────────────────────────────────────────────────────────────────── */
 
 const BASE_TABS = [
-  { key: "plan", icon: "workspace_premium", label: "Buy Plan" },
+  { key: "create_invoice", icon: "add_shopping_cart", label: "Create Invoice" },
   { key: "products", icon: "inventory_2", label: "Products" },
-  { key: "invoice", icon: "receipt_long", label: "Demo Invoice" },
+  { key: "history", icon: "history", label: "Invoice History" },
+  { key: "plan", icon: "workspace_premium", label: "Buy Plan" },
   { key: "profile", icon: "manage_accounts", label: "Profile" },
 ];
 
@@ -90,6 +31,7 @@ const ACTIVE_SUBSCRIPTION_TABS = [
   { key: "create_invoice", icon: "add_shopping_cart", label: "Create Invoice" },
   { key: "products", icon: "inventory_2", label: "Products" },
   { key: "history", icon: "history", label: "Invoice History" },
+  { key: "plan", icon: "workspace_premium", label: "Buy Plan" },
   { key: "profile", icon: "manage_accounts", label: "Profile" },
 ];
 
@@ -226,18 +168,12 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!loading) {
-      const isActiveSubscriber = mySub?.status === "active";
       if (!tab) {
-        navigate(isActiveSubscriber ? "/dashboard/create_invoice" : "/dashboard/plan", { replace: true });
+        navigate("/dashboard/create_invoice", { replace: true });
         return;
       }
-      if (isActiveSubscriber && (activeTab === "plan" || activeTab === "invoice")) {
-        navigate("/dashboard/create_invoice", { replace: true });
-      } else if (!isActiveSubscriber && (activeTab === "create_invoice" || activeTab === "history")) {
-        navigate("/dashboard/plan", { replace: true });
-      }
     }
-  }, [loading, mySub?.status, tab, activeTab, navigate]);
+  }, [loading, tab, navigate]);
 
   const handleLogout = () => {
     sessionStorage.clear();
@@ -320,7 +256,6 @@ export function Dashboard() {
           />
         )}
         {activeTab === "products" && <ProductManagement mySub={mySub} shop={shop} />}
-        {activeTab === "invoice" && <TabDemoInvoice shop={shop} />}
         {activeTab === "create_invoice" && (
           <TabCreateInvoice
             shop={shop}
@@ -364,7 +299,7 @@ export function Dashboard() {
         }}
       >
         <div className="max-w-lg mx-auto flex items-stretch h-16">
-          {(mySub?.status === "active" ? ACTIVE_SUBSCRIPTION_TABS : BASE_TABS).map((tabItem) => {
+          {BASE_TABS.map((tabItem) => {
             const active = tabItem.key === activeTab;
             return (
               <button
@@ -706,242 +641,8 @@ function TabBuyPlan({
   );
 }
 
-/* ════════════════════════════════════════════════════════════════════════════ */
-/*  Tab 2 — Products                                                          */
-/* ════════════════════════════════════════════════════════════════════════════ */
 
-function TabProducts({ mySub }: { mySub: ApiUserSubscription | null }) {
-  const maxProducts = mySub?.planId?.maxProductsPerShop ?? 10;
-  const planName = mySub?.planId?.name ?? "Free";
 
-  return (
-    <div className="px-4 pt-5 pb-4">
-      {/* Header row */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2
-            className="text-lg font-extrabold text-ds-primary"
-            style={{ fontFamily: "'Manrope', sans-serif" }}
-          >
-            My Products
-          </h2>
-          <p className="text-xs text-ds-outline">
-            {DEMO_PRODUCTS.length} of {maxProducts === -1 ? "∞" : maxProducts} used · {planName} plan
-          </p>
-        </div>
-        <button
-          className="flex items-center gap-1 text-xs font-bold px-3 py-2 rounded-xl text-white active:scale-95 transition-all"
-          style={{ background: "var(--ds-primary-container)" }}
-        >
-          <span className="material-symbols-outlined text-base">add</span>
-          Add
-        </button>
-      </div>
-
-      {/* Free plan nudge */}
-      <div
-        className="flex items-center gap-3 rounded-xl p-3 mb-4 border"
-        style={{
-          background: "rgba(254,187,125,0.12)",
-          borderColor: "var(--ds-on-tertiary-container)",
-        }}
-      >
-        <span
-          className="material-symbols-outlined text-xl flex-shrink-0"
-          style={{
-            color: "var(--ds-tertiary)",
-            fontVariationSettings: "'FILL' 1",
-          }}
-        >
-          lock
-        </span>
-        <p className="text-xs text-ds-on-surface-variant leading-relaxed">
-          <strong className="text-ds-on-surface">{planName} plan</strong> allows up to{" "}
-          {maxProducts === -1 ? "unlimited" : maxProducts} products.{" "}
-          {maxProducts !== -1 && (
-            <span className="font-semibold" style={{ color: "var(--ds-primary-container)" }}>
-              Upgrade to add more.
-            </span>
-          )}
-        </p>
-      </div>
-
-      {/* Product cards */}
-      <div className="space-y-3">
-        {DEMO_PRODUCTS.map((product) => (
-          <div
-            key={product.id}
-            className="rounded-2xl border p-4 flex items-center gap-4 transition-all active:scale-[0.99]"
-            style={{
-              background: "var(--ds-surface-container-lowest)",
-              borderColor: "var(--ds-outline-variant)",
-            }}
-          >
-            <div
-              className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-              style={{ background: "var(--ds-surface-container-low)" }}
-            >
-              {product.emoji}
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-ds-on-surface truncate">
-                {product.name}
-              </p>
-              <p className="text-xs text-ds-outline mt-0.5">{product.category}</p>
-              <div className="flex items-center gap-3 mt-1.5">
-                <span className="text-sm font-bold" style={{ color: "var(--ds-primary-container)" }}>
-                  ৳{product.price.toLocaleString()}
-                </span>
-                <span className="text-xs text-ds-outline">
-                  Stock:{" "}
-                  {product.stock === 0 ? (
-                    <span className="text-red-500 font-semibold">Out</span>
-                  ) : (
-                    product.stock
-                  )}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-end gap-2">
-              <span
-                className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                style={{
-                  background:
-                    product.status === "active"
-                      ? "rgba(0,92,114,0.1)"
-                      : "var(--ds-surface-container-high)",
-                  color:
-                    product.status === "active"
-                      ? "var(--ds-primary-container)"
-                      : "var(--ds-outline)",
-                }}
-              >
-                {product.status}
-              </span>
-              <button className="p-1.5 rounded-lg text-ds-outline hover:bg-ds-surface-container-high transition-colors">
-                <span className="material-symbols-outlined text-base">edit</span>
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <p className="text-center text-xs text-ds-outline mt-5">
-        ✦ These are demo products loaded for preview
-      </p>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════ */
-/*  Tab 3 — Demo Invoice (POS Receipt Style)                                  */
-/* ════════════════════════════════════════════════════════════════════════════ */
-
-function TabDemoInvoice({ shop }: { shop: ApiShop | null }) {
-  const shopName = shop?.name ?? "Your Shop Name";
-  const shopAddress = shop ? formatAddress(shop.address) : "Shop address will appear here";
-  const shopPhone = shop?.contactNumber || "+880 1XXX-XXXXXX";
-  const fbLink = shop?.socialLinks?.facebook || "";
-  const igLink = shop?.socialLinks?.instagram || "";
-
-  const invNumber = "INV-2026-0001";
-  const invDate = new Date().toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-
-  const items = DEMO_INVOICE_ITEMS;
-  const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
-  const discount = 200;
-  const grandTotal = subtotal - discount;
-
-  return (
-    <div className="px-4 pt-5 pb-4">
-      <div className="mb-4">
-        <h2
-          className="text-lg font-extrabold text-ds-primary"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
-          Demo Receipt
-        </h2>
-        <p className="text-xs text-ds-outline mt-0.5">
-          Preview how your invoices will look to customers.
-        </p>
-      </div>
-
-      {/* Unlock banner */}
-      <div
-        className="flex items-center gap-3 rounded-xl p-3 mb-5 border"
-        style={{
-          background: "rgba(0,92,114,0.06)",
-          borderColor: "var(--ds-primary-container)",
-        }}
-      >
-        <span
-          className="material-symbols-outlined text-xl flex-shrink-0"
-          style={{
-            color: "var(--ds-primary-container)",
-            fontVariationSettings: "'FILL' 1",
-          }}
-        >
-          star
-        </span>
-        <p className="text-xs text-ds-on-surface-variant leading-relaxed">
-          Unlock <strong className="text-ds-on-surface">receipt branding</strong> and custom colors on the{" "}
-          <span className="font-semibold" style={{ color: "var(--ds-primary-container)" }}>
-            Business plan
-          </span>
-          .
-        </p>
-      </div>
-
-      {/* ── POS Receipt Card ── */}
-      <InvoiceTemplate
-        shopName={shopName}
-        shopAddress={shopAddress}
-        shopPhone={shopPhone}
-        fbLink={fbLink}
-        igLink={igLink}
-        footerText={shop?.receiptConfig?.footerText || ""}
-        invNumber={invNumber}
-        invDate={invDate}
-        customerName="Rahim Ahmed"
-        customerPhone="+880 1934-567890"
-        items={items}
-        subtotal={subtotal}
-        discount={discount}
-        grandTotal={grandTotal}
-        isDemo={true}
-      />
-
-      {/* Print / share */}
-      <div className="flex gap-3 mt-4">
-        <button
-          className="flex-1 py-3 rounded-xl border text-sm font-bold text-ds-outline flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
-          disabled
-          style={{ borderColor: "var(--ds-outline-variant)" }}
-        >
-          <span className="material-symbols-outlined text-base">print</span>
-          Print
-        </button>
-        <button
-          className="flex-1 py-3 rounded-xl border text-sm font-bold text-ds-outline flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
-          disabled
-          style={{ borderColor: "var(--ds-outline-variant)" }}
-        >
-          <span className="material-symbols-outlined text-base">share</span>
-          Share
-        </button>
-      </div>
-      <p className="text-center text-[10px] text-ds-outline mt-2">
-        Print &amp; Share unlocked on Starter plan+
-      </p>
-    </div>
-  );
-}
 
 /* ════════════════════════════════════════════════════════════════════════════ */
 /*  Tab 4 — Profile (Fully Dynamic)                                           */
@@ -1698,10 +1399,9 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             </button>
           ))}
 
-          {/* App version */}
           <div className="text-center pt-2">
             <p className="text-[10px] text-ds-outline">
-              {process.env.APP_NAME} v1.0.0 · Built with ♥ Kanto065@gmail.com
+              {import.meta.env.VITE_APP_NAME} v1.0.0 · Built with ♥ Kanto065@gmail.com
             </p>
           </div>
         </div>

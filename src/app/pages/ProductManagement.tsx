@@ -24,10 +24,15 @@ export function ProductManagement({
   const [varients, setVarients] = useState<{ _id: string; name: string; value: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-
-  // Modal states
+  const [modalError, setModalError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ApiProduct | null>(null);
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const limit = 10;
 
   // Form states
   const [formData, setFormData] = useState({
@@ -40,18 +45,23 @@ export function ProductManagement({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchPrimaryData = async () => {
+  const fetchPrimaryData = async (page = currentPage) => {
     try {
       const isFreePlan = planName.toLowerCase() === "free";
 
       const [prodRes, demoRes, varRes] = await Promise.all([
-        shop?._id ? productApi.getAll(false, shop._id) : Promise.resolve({ success: true, products: [], total: 0 }),
-        isFreePlan ? productApi.getAll(true) : Promise.resolve({ success: true, products: [], total: 0 }),
+        shop?._id ? productApi.getAll(false, shop._id, page, limit) : Promise.resolve({ success: true, products: [], total: 0 }),
+        (!isFreePlan && page === 1) ? productApi.getAll(true) : Promise.resolve({ success: true, products: [], total: 0 }),
         varientAttributeApi.getAll(),
       ]);
 
       let finalProducts: ApiProduct[] = [];
-      if (prodRes.success) finalProducts = [...prodRes.products];
+      if (prodRes.success) {
+        finalProducts = [...prodRes.products];
+        setTotalPages(Math.ceil((prodRes.total || 0) / limit));
+        setTotalProducts(prodRes.total || 0);
+      }
+      
       if (demoRes.success && demoRes.products.length > 0) {
         finalProducts = [...finalProducts, ...demoRes.products];
       }
@@ -67,8 +77,17 @@ export function ProductManagement({
   };
 
   useEffect(() => {
-    fetchPrimaryData();
+    if (shop?._id) {
+      setCurrentPage(1);
+      fetchPrimaryData(1);
+    }
   }, [shop?._id]);
+
+  useEffect(() => {
+    if (shop?._id) {
+      fetchPrimaryData(currentPage);
+    }
+  }, [currentPage]);
 
   const showToast = (msg: string, type: "success" | "error") => {
     setToast({ msg, type });
@@ -85,6 +104,7 @@ export function ProductManagement({
       status: "active",
     });
     setSelectedFiles([]);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
@@ -98,6 +118,7 @@ export function ProductManagement({
       status: product.status,
     });
     setSelectedFiles([]);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
@@ -122,6 +143,7 @@ export function ProductManagement({
     });
 
     try {
+      setModalError(null);
       if (editingProduct) {
         await productApi.update(editingProduct._id, fd);
         showToast("Product updated successfully", "success");
@@ -132,6 +154,7 @@ export function ProductManagement({
       setIsModalOpen(false);
       fetchPrimaryData();
     } catch (err: any) {
+      setModalError(err.message || "Failed to save product");
       showToast(err.message || "Failed to save product", "error");
     } finally {
       setIsSubmitting(false);
@@ -171,7 +194,7 @@ export function ProductManagement({
             My Products
           </h2>
           <p className="text-xs text-ds-outline">
-            {products.length} of {maxProducts === -1 ? "∞" : maxProducts} used · {planName} plan
+            {totalProducts} of {maxProducts === -1 ? "∞" : maxProducts} used · {planName} plan
           </p>
         </div>
         <button
@@ -285,6 +308,31 @@ export function ProductManagement({
         </div>
       )}
 
+      {/* Pagination bar */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between py-4 border-t border-ds-outline-variant/30 mt-4">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            className="h-9 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-xs font-bold disabled:opacity-30 active:scale-95 transition-all bg-ds-surface-container-low flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-sm">chevron_left</span>
+            Prev
+          </button>
+          <div className="text-[11px] font-black text-ds-outline uppercase tracking-widest">
+            Page <span className="text-ds-primary">{currentPage}</span> of {totalPages}
+          </div>
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            className="h-9 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-xs font-bold disabled:opacity-30 active:scale-95 transition-all bg-ds-surface-container-low flex items-center gap-1"
+          >
+            Next
+            <span className="material-symbols-outlined text-sm">chevron_right</span>
+          </button>
+        </div>
+      )}
+
       {/* Modal / Dialog */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
@@ -303,6 +351,13 @@ export function ProductManagement({
                 <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
+
+            {modalError && (
+              <div className="mx-4 mt-4 p-3 rounded-xl bg-ds-error-container text-ds-on-error-container text-xs font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-1 border border-ds-error/20">
+                <span className="material-symbols-outlined text-base">error</span>
+                {modalError}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="p-4 overflow-y-auto space-y-4">
               <div>

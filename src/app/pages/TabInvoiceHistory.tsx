@@ -120,13 +120,52 @@ export function TabInvoiceHistory({
     }
   };
 
-  const handlePrintSelected = () => {
-    setIsPrintingMultiple(true);
-    // Give it a full second to render all selected templates in the background
-    setTimeout(() => {
-      window.print();
-      setIsPrintingMultiple(false);
-    }, 1000);
+  const handlePrintSelected = async () => {
+    if (!shop || selectedIds.length === 0) return;
+    try {
+      // Mark as printed in backend to enforce limits
+      for (const id of selectedIds) {
+        const inv = invoices.find(i => i._id === id);
+        if (inv && inv.status !== "printed") {
+          await invoiceApi.updateStatus(shop._id, id, "printed");
+        }
+      }
+      
+      // Local update to UI
+      setInvoices(prev => prev.map(i => selectedIds.includes(i._id) ? { ...i, status: "printed" } : i));
+      
+      setIsPrintingMultiple(true);
+      // Give it a full second to render all selected templates in the background
+      setTimeout(() => {
+        window.print();
+        setIsPrintingMultiple(false);
+        setSelectedIds([]);
+      }, 1000);
+    } catch (err: any) {
+      setToast({ msg: err.message || "Failed to initiate multiple print", type: "error" });
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
+  const handlePrint = async (inv: ApiInvoice) => {
+    if (!shop) return;
+    try {
+      // Only call backend if not already marked printed
+      if (inv.status !== "printed") {
+        await invoiceApi.updateStatus(shop._id, inv._id, "printed");
+        // Update local state
+        setInvoices(prev => prev.map(i => i._id === inv._id ? { ...i, status: "printed" } : i));
+        if (previewInvoice?._id === inv._id) {
+          setPreviewInvoice({ ...previewInvoice, status: "printed" });
+        }
+      }
+      
+      // Trigger browser print
+      setTimeout(() => window.print(), 300);
+    } catch (err: any) {
+      setToast({ msg: err.message || "Failed to initiate print", type: "error" });
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
   const getStatusColor = (status: ApiInvoice["status"]) => {
@@ -485,7 +524,7 @@ export function TabInvoiceHistory({
                 Edit
               </button>
               <button
-                onClick={() => setTimeout(() => window.print(), 300)}
+                onClick={() => handlePrint(previewInvoice)}
                 className="flex-[1.5] py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform flex justify-center items-center gap-2"
                 style={{ background: "var(--ds-primary)" }}
               >
