@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { type ApiShop, type ApiInvoice, invoiceApi, type ApiProduct, productApi } from "../auth.utils";
+import { type ApiShop, type ApiInvoice, type ApiProduct } from "../types";
+import { invoiceApi } from "../api/invoice.api";
+import { productApi } from "../api/product.api";
 import { InvoiceTemplate } from "../components/InvoiceTemplate";
 import { InvoiceWrapper } from "../components/InvoiceWrapper";
+import { useInvoiceExport } from "../utils/useInvoiceExport";
 
 function formatAddress(addr: ApiShop["address"]): string {
   return addr?.address_line1 || "";
@@ -43,6 +46,7 @@ export function TabCreateInvoice({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [lastSavedInvoice, setLastSavedInvoice] = useState<ApiInvoice | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const { isExporting, exportOne, ExportCaptureContainer } = useInvoiceExport(shop);
 
   useEffect(() => {
     if (shop) {
@@ -206,6 +210,65 @@ export function TabCreateInvoice({
     }
   };
 
+  const handleExport = async () => {
+    if (!shop) return;
+    if (cart.length === 0) {
+      showToast("Add at least one product to the invoice.", "error");
+      return;
+    }
+    try {
+      const items = cart.map(c => {
+        let name = c.product.name;
+        if (typeof c.product.varientId === 'object' && c.product.varientId) {
+          name += ` • ${c.product.varientId.name}: ${c.product.varientId.value}`;
+        }
+        if (c.variety) name += ` (${c.variety})`;
+        return { name, quantity: c.quantity, unitPrice: c.product.price };
+      });
+
+      let finalDateStr: string | undefined;
+      if (invoiceDate) {
+        const [y, m, d] = invoiceDate.split('-').map(Number);
+        if (editInvoice?.createdAt) {
+          const original = new Date(editInvoice.createdAt);
+          original.setFullYear(y, m - 1, d);
+          finalDateStr = original.toISOString();
+        } else {
+          const now = new Date();
+          now.setFullYear(y, m - 1, d);
+          finalDateStr = now.toISOString();
+        }
+      }
+
+      const payload = {
+        customerName, customerPhone, customerEmail, customerAddress,
+        items, discountType, discount: discountValue, advanceAmount,
+        deliveryCharge, isDeliveryPaid, notes,
+        status: "issued",
+        date: finalDateStr,
+      };
+
+      let invoice: ApiInvoice;
+      if (editInvoice) {
+        const res = await invoiceApi.updateInvoice(shop._id, editInvoice._id, payload);
+        invoice = res.invoice;
+      } else {
+        const res = await invoiceApi.createInvoice(shop._id, payload);
+        invoice = res.invoice;
+      }
+
+      // After saving invoice and getting the invoice object back:
+      await exportOne(invoice);
+
+      showToast("Invoice exported as image!", "success");
+      setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail("");
+      setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
+      if (onCancelEdit) onCancelEdit();
+    } catch (err: any) {
+      showToast(err.message || "Export failed", "error");
+    }
+  };
+
   if (!shop) return <div className="p-5 text-center text-ds-outline">No shop selected</div>;
 
   return (
@@ -287,8 +350,8 @@ export function TabCreateInvoice({
                 value={customerAddress}
                 onChange={e => setCustomerAddress(e.target.value)}
                 placeholder="e.g. 123 Street, Dhaka"
-                rows={2}
-                className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container resize-none"
+                rows={3}
+                className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container resize-y min-h-[72px]"
               />
             </div>
           </div>
@@ -487,29 +550,52 @@ export function TabCreateInvoice({
           </div>
         </div>
 
-        <div className="flex gap-2 pt-2">
-          <button
-            onClick={() => setPreviewOpen(true)}
-            className="flex-[1] py-3.5 rounded-xl border border-ds-outline-variant text-ds-on-surface font-semibold text-sm active:scale-95 transition-transform"
-          >
-            Preview
-          </button>
-          <button
-            onClick={() => handleCreate(false)}
-            disabled={saving}
-            className="flex-[1.5] py-3.5 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center"
-          >
-            {saving ? "Saving..." : (editInvoice ? "Update" : "Save")}
-          </button>
-          <button
-            onClick={() => handleCreate(true)}
-            disabled={saving}
-            className="flex-[1.5] py-3.5 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center gap-2"
-            style={{ background: "var(--ds-primary)" }}
-          >
-            {saving ? <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <span className="material-symbols-outlined text-lg">print</span>}
-            {saving ? "Saving..." : (editInvoice ? "Update & Print" : "Print")}
-          </button>
+        <div className="flex flex-col gap-2 pt-2">
+          {/* Row 1: Secondary actions */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPreviewOpen(true)}
+              className="flex-1 py-3 rounded-xl border border-ds-outline-variant text-ds-on-surface-variant font-semibold text-sm active:scale-95 transition-transform"
+            >
+              Preview
+            </button>
+            <button
+              onClick={() => handleCreate(false)}
+              disabled={saving || isExporting}
+              className="flex-1 py-3 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-50 flex justify-center items-center"
+            >
+              {saving ? "Saving..." : (editInvoice ? "Update" : "Save")}
+            </button>
+          </div>
+
+          {/* Row 2: Primary actions */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleExport}
+              disabled={isExporting || saving}
+              className="flex-1 py-3.5 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-50 flex justify-center items-center gap-1.5"
+            >
+              {isExporting ? (
+                <span className="h-4 w-4 border-2 border-ds-primary/30 border-t-ds-primary rounded-full animate-spin" />
+              ) : (
+                <span className="material-symbols-outlined text-[18px]">download</span>
+              )}
+              {isExporting ? "Exporting..." : (editInvoice ? "Update & Export" : "Export")}
+            </button>
+            <button
+              onClick={() => handleCreate(true)}
+              disabled={saving || isExporting}
+              className="flex-1 py-3.5 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-50 flex justify-center items-center gap-1.5"
+              style={{ background: "var(--ds-primary)" }}
+            >
+              {saving ? (
+                <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <span className="material-symbols-outlined text-[18px]">print</span>
+              )}
+              {saving ? "Saving..." : (editInvoice ? "Update & Print" : "Print")}
+            </button>
+          </div>
         </div>
 
         {/* ── Preview Modal ── */}
@@ -571,6 +657,8 @@ export function TabCreateInvoice({
           </div>
         )}
       </div>
+
+      <ExportCaptureContainer />
 
       {/* ── Hidden Printable Invoice Template ── */}
       <div className="hidden print:block absolute top-0 left-0 z-[99999] bg-white text-black p-0 m-0 w-full h-auto">

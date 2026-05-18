@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { authApi } from "../auth.utils";
+import { authApi } from "../api/auth.api";
 
 export function ForgotPassword() {
   const navigate = useNavigate();

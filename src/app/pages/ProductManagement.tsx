@@ -1,11 +1,6 @@
 import { useState, useEffect } from "react";
-import {
-  productApi,
-  varientAttributeApi,
-  ApiProduct,
-  ApiUserSubscription,
-  ApiShop,
-} from "../auth.utils";
+import { productApi, varientAttributeApi } from "../api/product.api";
+import type { ApiProduct, ApiUserSubscription, ApiShop } from "../types";
 
 const API_IMAGE_URL = (import.meta.env.VITE_API_BASE_URL || "https://api.memobook.shop/api")
   .replace(/\/api\/?$/, "") + "/image/";

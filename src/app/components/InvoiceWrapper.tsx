@@ -1,5 +1,5 @@
 import { InvoiceTemplate } from "./InvoiceTemplate";
-import { type ApiInvoice, type ApiShop } from "../auth.utils";
+import type { ApiInvoice, ApiShop } from "../types";
 
 interface InvoiceWrapperProps {
   shop: ApiShop;

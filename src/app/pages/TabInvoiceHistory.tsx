@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
-import domtoimage from "dom-to-image-more";
-import { type ApiShop, type ApiInvoice, invoiceApi } from "../auth.utils";
+import { useState, useEffect } from "react";
+import { type ApiShop, type ApiInvoice } from "../types";
+import { invoiceApi } from "../api/invoice.api";
 import { InvoiceTemplate } from "../components/InvoiceTemplate";
 import { InvoiceWrapper } from "../components/InvoiceWrapper";
+import { useInvoiceExport } from "../utils/useInvoiceExport";
 
 function formatAddress(addr: ApiShop["address"]): string {
   return addr?.address_line1 || "";
@@ -24,41 +25,39 @@ export function TabInvoiceHistory({
   // Pagination & Filtering
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [filterDate, setFilterDate] = useState("");
-  const limit = 10;
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [limit, setLimit] = useState(20);
 
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isExporting, setIsExporting] = useState(false);
-  const exportRef = useRef<HTMLDivElement>(null);
-  const [exportingInvoice, setExportingInvoice] = useState<ApiInvoice | null>(null);
   const [isPrintingMultiple, setIsPrintingMultiple] = useState(false);
+  const { isExporting, exportMany, ExportCaptureContainer } = useInvoiceExport(shop);
 
 
   useEffect(() => {
     if (shop) {
       setCurrentPage(1);
-      fetchInvoices(1, filterDate);
+      fetchInvoices(1, filterDateFrom, filterDateTo, limit);
     }
-  }, [shop, filterDate]);
+  }, [shop, filterDateFrom, filterDateTo, limit]);
 
   useEffect(() => {
     if (shop) {
-      fetchInvoices(currentPage, filterDate);
+      fetchInvoices(currentPage, filterDateFrom, filterDateTo, limit);
     }
   }, [currentPage]);
 
 
 
 
-  const fetchInvoices = async (page = currentPage, date = filterDate) => {
+  const fetchInvoices = async (page = currentPage, dateFrom = filterDateFrom, dateTo = filterDateTo, pageSize = limit) => {
     if (!shop) return;
     setLoading(true);
     try {
-      const res = await invoiceApi.listInvoices(shop._id, page, limit, date);
-      // Backend returns total items, calculate total pages
+      const res = await invoiceApi.listInvoices(shop._id, page, pageSize, dateFrom, dateTo);
       setInvoices(res.invoices);
-      setTotalPages(Math.ceil((res.total || 0) / limit));
+      setTotalPages(Math.ceil((res.total || 0) / pageSize));
     } catch (err: any) {
       setToast({ msg: err.message || "Failed to load invoices", type: "error" });
       setTimeout(() => setToast(null), 3000);
@@ -82,69 +81,31 @@ export function TabInvoiceHistory({
     }
   };
 
-  const handleExportSelected = async () => {
-    if (selectedIds.length === 0) return;
-    setIsExporting(true);
-
-    try {
-      const selectedInvoices = invoices.filter(inv => selectedIds.includes(inv._id));
-
-      for (const inv of selectedInvoices) {
-        setExportingInvoice(inv);
-        // Wait for fonts and components to fully render
-        await new Promise(resolve => setTimeout(resolve, 400));
-
-        if (exportRef.current) {
-          // Use 'as any' to bypass the incomplete community type definitions
-          const dataUrl = await (domtoimage as any).toPng(exportRef.current, {
-            quality: 1.0,
-            bgcolor: "#ffffff",
-            width: 360, // Tightened to remove horizontal gaps
-            scale: 4, // 4x Resolution (High Definition)
-          });
-          const link = document.createElement("a");
-          link.href = dataUrl;
-          link.download = `Invoice-${inv.invoiceNumber}-${inv.customerName || "Customer"}.png`;
-          link.click();
-        }
-      }
-
-      setToast({ msg: `Successfully exported ${selectedIds.length} invoices as images`, type: "success" });
-      setSelectedIds([]);
-    } catch (err: any) {
-      setToast({ msg: "Export failed", type: "error" });
-    } finally {
-      setIsExporting(false);
-      setExportingInvoice(null);
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  const handlePrintSelected = async () => {
+  const handlePrintSelected = () => {
     if (!shop || selectedIds.length === 0) return;
-    try {
-      // Mark as printed in backend to enforce limits
-      for (const id of selectedIds) {
-        const inv = invoices.find(i => i._id === id);
-        if (inv && inv.status !== "printed") {
-          await invoiceApi.updateStatus(shop._id, id, "printed");
-        }
-      }
-      
-      // Local update to UI
-      setInvoices(prev => prev.map(i => selectedIds.includes(i._id) ? { ...i, status: "printed" } : i));
-      
-      setIsPrintingMultiple(true);
-      // Give it a full second to render all selected templates in the background
-      setTimeout(() => {
-        window.print();
-        setIsPrintingMultiple(false);
-        setSelectedIds([]);
-      }, 1000);
-    } catch (err: any) {
-      setToast({ msg: err.message || "Failed to initiate multiple print", type: "error" });
-      setTimeout(() => setToast(null), 3000);
-    }
+
+    // Render templates then print — status update runs in background and never blocks printing
+    setIsPrintingMultiple(true);
+    setTimeout(() => {
+      window.print();
+      setIsPrintingMultiple(false);
+      setSelectedIds([]);
+    }, 800);
+
+    // Update status in background; optimistic local update immediately
+    const idsToMark = invoices
+      .filter(inv => selectedIds.includes(inv._id) && inv.status !== "printed")
+      .map(inv => inv._id);
+
+    setInvoices(prev =>
+      prev.map(i => idsToMark.includes(i._id) ? { ...i, status: "printed" } : i)
+    );
+
+    idsToMark.forEach(id => {
+      invoiceApi.updateStatus(shop._id, id, "printed").catch(() => {
+        // Status update failed silently — print still completed
+      });
+    });
   };
 
   const handlePrint = async (inv: ApiInvoice) => {
@@ -203,7 +164,7 @@ export function TabInvoiceHistory({
 
   return (
     <>
-      <div className="px-4 pt-5 pb-4 space-y-4 print:hidden">
+      <div className={`px-4 pt-5 space-y-4 print:hidden transition-all ${selectedIds.length > 0 ? "pb-28" : "pb-4"}`}>
         {toast && (
           <div
             className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg font-medium text-sm w-[90%] max-w-sm"
@@ -216,9 +177,9 @@ export function TabInvoiceHistory({
           </div>
         )}
 
-        {/* Header - Staked 2-Row Layout for Mobile */}
+        {/* Sticky Header */}
         <div className="sticky top-[-20px] z-20 bg-ds-background/95 backdrop-blur-sm -mx-4 px-4 py-3 border-b border-ds-outline-variant/30 space-y-3 shadow-sm">
-          {/* Row 1: Title & Actions */}
+          {/* Row 1: Title + Refresh only */}
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-extrabold text-ds-primary leading-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
@@ -226,61 +187,45 @@ export function TabInvoiceHistory({
               </h2>
               <p className="text-[10px] text-ds-outline font-bold uppercase tracking-tighter">Inventory History</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => fetchInvoices()}
-                className="h-9 w-9 flex items-center justify-center rounded-xl bg-ds-surface-container-low text-ds-on-surface hover:bg-ds-surface-container-high border border-ds-outline-variant transition-colors"
-                title="Refresh List"
-              >
-                <span className={`material-symbols-outlined text-[18px] ${loading ? "animate-spin" : ""}`}>refresh</span>
-              </button>
-            </div>
+            <button
+              onClick={() => fetchInvoices()}
+              className="h-9 w-9 flex items-center justify-center rounded-xl bg-ds-surface-container-low text-ds-on-surface hover:bg-ds-surface-container-high border border-ds-outline-variant transition-colors"
+              title="Refresh"
+            >
+              <span className={`material-symbols-outlined text-[18px] ${loading ? "animate-spin" : ""}`}>refresh</span>
+            </button>
           </div>
 
-          {/* Row 2: Date Filter & Multi-Select Buttons */}
-          <div className="flex items-center gap-2">
-            {/* Date Filter - Takes available space */}
-            <div className="flex-1 relative flex items-center h-9 px-3 rounded-xl border border-ds-outline-variant bg-ds-surface-container-lowest focus-within:border-ds-primary/30 transition-all shadow-sm">
-              <span className="material-symbols-outlined text-[16px] text-ds-outline mr-2">calendar_today</span>
+          {/* Row 2: Date range filter only */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex-1 flex items-center h-9 px-2.5 rounded-xl border border-ds-outline-variant bg-ds-surface-container-lowest focus-within:border-ds-primary/30 transition-all shadow-sm">
+              <span className="material-symbols-outlined text-[14px] text-ds-outline mr-1.5 flex-shrink-0">calendar_today</span>
               <input
                 type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="bg-transparent border-none outline-none text-[11px] font-bold text-ds-on-surface w-full"
+                value={filterDateFrom}
+                max={filterDateTo || undefined}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="bg-transparent border-none outline-none text-[11px] font-bold text-ds-on-surface w-full min-w-0"
               />
-              {filterDate && (
-                <button onClick={() => setFilterDate("")} className="ml-1 text-ds-outline hover:text-ds-error">
-                  <span className="material-symbols-outlined text-[16px]">close</span>
-                </button>
-              )}
             </div>
-
-            {/* Selection Buttons - Appear only when items selected */}
-            {selectedIds.length > 0 && (
-              <div className="flex items-center gap-1.5 animate-in slide-in-from-right-2 duration-200">
-                <button
-                  onClick={handlePrintSelected}
-                  className="h-9 w-9 flex items-center justify-center rounded-xl border border-ds-outline-variant text-ds-on-surface bg-ds-surface-container-low active:scale-95 transition-all shadow-sm"
-                  title={`Print ${selectedIds.length} invoices`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">print</span>
-                </button>
-                <button
-                  onClick={handleExportSelected}
-                  disabled={isExporting}
-                  className="h-9 w-9 flex items-center justify-center rounded-xl bg-ds-primary-container text-white active:scale-95 transition-all disabled:opacity-50 shadow-sm"
-                  title={`Export ${selectedIds.length} invoices`}
-                >
-                  {isExporting ? (
-                    <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <span className="material-symbols-outlined text-[18px]">download</span>
-                  )}
-                </button>
-                <div className="h-9 px-2 flex items-center justify-center rounded-lg bg-ds-primary/10 text-ds-primary text-[10px] font-black">
-                  {selectedIds.length}
-                </div>
-              </div>
+            <span className="text-[10px] font-black text-ds-outline flex-shrink-0">TO</span>
+            <div className="flex-1 flex items-center h-9 px-2.5 rounded-xl border border-ds-outline-variant bg-ds-surface-container-lowest focus-within:border-ds-primary/30 transition-all shadow-sm">
+              <input
+                type="date"
+                value={filterDateTo}
+                min={filterDateFrom || undefined}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="bg-transparent border-none outline-none text-[11px] font-bold text-ds-on-surface w-full min-w-0"
+              />
+            </div>
+            {(filterDateFrom || filterDateTo) && (
+              <button
+                onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                className="flex-shrink-0 text-ds-outline hover:text-ds-error transition-colors"
+                title="Clear date range"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
             )}
           </div>
         </div>
@@ -301,15 +246,15 @@ export function TabInvoiceHistory({
           </div>
         ) : (
           <div className="space-y-3">
-            {/* <div className="flex items-center gap-2 px-1"> */}
-            {/* <input
+            <div className="flex items-center gap-2 px-1">
+              <input
                 type="checkbox"
                 checked={selectedIds.length === invoices.length && invoices.length > 0}
                 onChange={toggleSelectAll}
-                className="h-4 w-4 rounded border-ds-outline-variant text-ds-primary focus:ring-ds-primary"
-              /> */}
-            {/* <span className="text-xs font-bold text-ds-outline uppercase tracking-wider">Select All</span> */}
-            {/* </div> */}
+                className="h-4 w-4 rounded border-ds-outline-variant accent-ds-primary cursor-pointer"
+              />
+              <span className="text-xs font-bold text-ds-outline uppercase tracking-wider select-none">Select All</span>
+            </div>
             {invoices.map((inv) => {
               const colors = getStatusColor(inv.status);
               const isSelected = selectedIds.includes(inv._id);
@@ -385,107 +330,110 @@ export function TabInvoiceHistory({
           </div>
         )}
 
-        {/* Pagination bar - Sticky Bottom mobile style */}
-        {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-between py-4 border-t border-ds-outline-variant/30 mt-4">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              className="h-9 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-xs font-bold disabled:opacity-30 active:scale-95 transition-all bg-ds-surface-container-low flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-sm">chevron_left</span>
-              Prev
-            </button>
-            <div className="text-[11px] font-black text-ds-outline uppercase tracking-widest">
-              Page <span className="text-ds-primary">{currentPage}</span> of {totalPages}
+        {/* Pagination bar */}
+        {!loading && (invoices.length > 0 || totalPages > 1) && (
+          <div className="py-4 border-t border-ds-outline-variant/30 mt-4 space-y-3">
+            {/* Page size selector */}
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-[10px] font-bold text-ds-outline uppercase tracking-wider">Per page</span>
+              <div className="flex gap-1">
+                {[20, 30, 50].map(size => (
+                  <button
+                    key={size}
+                    onClick={() => { setLimit(size); setCurrentPage(1); }}
+                    className={`h-7 px-3 rounded-lg text-[11px] font-black transition-all border ${
+                      limit === size
+                        ? "bg-ds-primary text-white border-ds-primary"
+                        : "bg-ds-surface-container-low text-ds-on-surface border-ds-outline-variant hover:border-ds-primary/50"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
             </div>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              className="h-9 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-xs font-bold disabled:opacity-30 active:scale-95 transition-all bg-ds-surface-container-low flex items-center gap-1"
-            >
-              Next
-              <span className="material-symbols-outlined text-sm">chevron_right</span>
-            </button>
+
+            {/* Prev / Page info / Next */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="h-9 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-xs font-bold disabled:opacity-30 active:scale-95 transition-all bg-ds-surface-container-low flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-sm">chevron_left</span>
+                  Prev
+                </button>
+                <div className="text-[11px] font-black text-ds-outline uppercase tracking-widest">
+                  Page <span className="text-ds-primary">{currentPage}</span> of {totalPages}
+                </div>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="h-9 px-4 rounded-xl border border-ds-outline-variant text-ds-on-surface text-xs font-bold disabled:opacity-30 active:scale-95 transition-all bg-ds-surface-container-low flex items-center gap-1"
+                >
+                  Next
+                  <span className="material-symbols-outlined text-sm">chevron_right</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
 
-      {/* Off-screen Capture Area */}
-      <div className="fixed top-0 left-[-9999px] pointer-events-none" style={{ width: "360px" }}>
-        <div ref={exportRef} id="export-container" style={{ width: "360px", background: "#ffffff" }}>
-          <style>{`
-  /* Import fonts for the capture context */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
+      {/* ── Bottom Bulk Action Bar ── */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-20 left-0 right-0 z-40 flex justify-center px-4 print:hidden animate-in slide-in-from-bottom-3 duration-250">
+          <div
+            className="w-full max-w-lg flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border border-ds-outline-variant/40"
+            style={{ background: "var(--ds-surface-container-low)" }}
+          >
+            {/* Dismiss */}
+            <button
+              onClick={() => setSelectedIds([])}
+              className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-xl bg-ds-surface-container-high text-ds-on-surface active:scale-95 transition-all"
+              title="Clear selection"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
 
-  /* Ultra-Tight Digital Export Styling */
-  #export-container {
-    padding: 12px 0px !important; /* Kept top spacing, removed side padding */
-    background-color: #ffffff !important;
-    width: 360px !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    font-family: 'Inter', sans-serif !important;
-    -webkit-font-smoothing: antialiased;
-  }
-  
-  #export-container * {
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-    text-rendering: optimizeLegibility !important;
-  }
-
-  /* Target the main card container precisely */
-  #export-container > div > div {
-    margin: 0 !important;
-    max-width: 100% !important;
-    border: 1.5px solid #e2e8f0 !important;
-    border-radius: 16px !important; /* Restored rounded look */
-  }
-
-  /* Restore teal header branding */
-  #export-container .bg-force {
-    background-color: #005C72 !important;
-    padding: 16px 8px !important; 
-  }
-
-  #export-container h3 {
-    font-family: 'Manrope', sans-serif !important;
-    font-weight: 800 !important;
-    letter-spacing: -0.01em !important;
-  }
-  
-  /* Precision Dashed Lines */
-  #export-container div[style*="border-bottom"],
-  #export-container div[style*="border-top"] {
-     border-bottom: 1px dashed #cbd5e1 !important; 
-     border-radius: 0 !important;
-  }
-
-  /* Restore Grand Total box */
-  #export-container .border-black {
-    border: 1px dashed #000000 !important;
-    border-radius: 8px !important;
-  }
-
-  #export-container p, #export-container span {
-    font-family: 'Inter', sans-serif !important;
-  }
-`}</style>
-          {exportingInvoice && (
-            <div style={{ backgroundColor: "#ffffff", padding: "0px" }}>
-              <InvoiceWrapper
-                shop={shop}
-                invoice={exportingInvoice}
-                noShadow={false}
-              />
+            {/* Count */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-extrabold text-ds-on-surface leading-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                {selectedIds.length} selected
+              </p>
+              <p className="text-[10px] text-ds-outline font-bold uppercase tracking-wider">invoice{selectedIds.length > 1 ? "s" : ""}</p>
             </div>
-          )}
+
+            {/* Print */}
+            <button
+              onClick={handlePrintSelected}
+              className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-xl border border-ds-outline-variant bg-ds-surface-container-lowest text-ds-on-surface active:scale-95 transition-all shadow-sm"
+              title="Print selected"
+            >
+              <span className="material-symbols-outlined text-[20px]">print</span>
+            </button>
+
+            {/* Export */}
+            <button
+              onClick={() => exportMany(invoices.filter(inv => selectedIds.includes(inv._id)))}
+              disabled={isExporting}
+              className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-xl text-white active:scale-95 transition-all disabled:opacity-60 shadow-sm"
+              style={{ background: "var(--ds-primary)" }}
+              title="Export as images"
+            >
+              {isExporting ? (
+                <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <span className="material-symbols-outlined text-[20px]">download</span>
+              )}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      <ExportCaptureContainer />
 
       {/* ── Preview Modal ── */}
       {previewInvoice && (

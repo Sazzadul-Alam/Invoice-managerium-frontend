@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router";
-import { authApi } from "../auth.utils";
+import { authApi } from "../api/auth.api";
 
 type Status = "loading" | "success" | "error";
 
