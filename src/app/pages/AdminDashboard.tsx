@@ -1,16 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router";
-import {
-  adminApi,
-  getToken,
-  getRole,
-  clearSession,
-  type SubStats,
-  type PopulatedSubscription,
-  type ApiPlan,
-  billingCycleApi,
-  type ApiBillingCycle,
-} from "../auth.utils";
+import { adminApi, billingCycleApi } from "../api/subscription.api";
+import { getToken, getRole, clearSession } from "../utils/session";
+import type { SubStats, PopulatedSubscription, ApiPlan, ApiBillingCycle } from "../types";
 
 /* ── tiny helpers ─────────────────────────────────────────────────── */
 const fmt = (n: number) => new Intl.NumberFormat("en-BD").format(n);
@@ -398,13 +390,13 @@ export function AdminDashboard() {
             fontFamily: "var(--font-headline)"
           }}>Pricing Plans</button>
 
-          {/* <button onClick={() => setSubTab("cycles")} style={{
+          <button onClick={() => setSubTab("cycles")} style={{
             background: "none", border: "none", padding: "8px 0", cursor: "pointer",
             fontWeight: subTab === "cycles" ? 800 : 600, fontSize: 16,
             color: subTab === "cycles" ? "var(--ds-primary)" : "var(--ds-on-surface-variant)",
             borderBottom: subTab === "cycles" ? "3px solid var(--ds-primary)" : "3px solid transparent",
             fontFamily: "var(--font-headline)"
-          }}>Billing Cycles</button> */}
+          }}>Billing Cycles</button>
         </div>
 
         {subTab === "plans" && (
@@ -447,7 +439,7 @@ export function AdminDashboard() {
                     <input required autoComplete="off" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
                       style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
                   </div>
-                  {/* <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Shops</label>
                       <input required autoComplete="off" type="number" value={formData.maxShops ?? ""} onChange={e => setFormData({ ...formData, maxShops: e.target.value === "" ? undefined : Number(e.target.value) })}
@@ -468,7 +460,7 @@ export function AdminDashboard() {
                       <input required autoComplete="off" type="number" value={formData.maxInvoicesPerMonth ?? ""} onChange={e => setFormData({ ...formData, maxInvoicesPerMonth: e.target.value === "" ? undefined : Number(e.target.value) })}
                         style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
                     </div>
-                  </div> */}
+                  </div>
                   <button type="submit" style={{
                     background: "var(--ds-primary)", color: "white", padding: "10px", borderRadius: 8,
                     border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 8
@@ -508,11 +500,11 @@ export function AdminDashboard() {
                     <p style={{ fontSize: 12, margin: "0 0 12px", color: "var(--ds-on-surface-variant)" }}>{p.description}</p>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
                       <div>
-                        {/* <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11 }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11 }}>
                           <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Shops: {p.maxShops === -1 ? "∞" : p.maxShops}</span>
                           <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Products: {p.maxProductsPerShop === -1 ? "∞" : p.maxProductsPerShop}</span>
                           <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Invoices: {p.maxInvoicesPerMonth === -1 ? "∞" : p.maxInvoicesPerMonth}</span>
-                        </div> */}
+                        </div>
                         {!p.isActive && p.deactivatedAt && (
                           <div style={{ fontSize: 10, color: "var(--ds-on-surface-variant)", marginTop: 6 }}>
                             Deactivated on: {new Date(p.deactivatedAt).toLocaleDateString()} {new Date(p.deactivatedAt).toLocaleTimeString()}

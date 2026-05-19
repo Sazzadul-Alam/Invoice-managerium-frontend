@@ -8,7 +8,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { cn } from "./utils";
-import { getRole } from "../../auth.utils";
+import { getRole } from "../../utils/session";
 
 const navItems = [
   {

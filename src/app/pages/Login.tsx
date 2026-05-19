@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { authApi, saveSession } from "../auth.utils";
+import { authApi } from "../api/auth.api";
+import { saveSession } from "../utils/session";
 
 export function Login() {
   const navigate = useNavigate();

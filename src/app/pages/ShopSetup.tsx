@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router";
-import { shopApi } from "../auth.utils";
+import { shopApi } from "../api/shop.api";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /*  Constants                                                                */

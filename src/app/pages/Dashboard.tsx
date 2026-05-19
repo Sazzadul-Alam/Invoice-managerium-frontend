@@ -1,16 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
-import {
-  type ApiUser,
-  type ApiShop,
-  type ApiPlan,
-  type ApiUserSubscription,
-  authApi,
-  shopApi,
-  subscriptionApi,
-  billingCycleApi,
-  type ApiBillingCycle,
-} from "../auth.utils";
+import type { ApiUser, ApiShop, ApiPlan, ApiUserSubscription, ApiBillingCycle } from "../types";
+import { authApi } from "../api/auth.api";
+import { shopApi } from "../api/shop.api";
+import { subscriptionApi, billingCycleApi } from "../api/subscription.api";
 import { ProductManagement } from "./ProductManagement";
 
 
@@ -154,7 +147,9 @@ export function Dashboard() {
       setShop(shopsRes.ownedShops[0] ?? null);
       setPlans(plansRes.plans);
       setCycles(cyclesRes.billingCycles);
-      setMySub(subRes.subscription);
+      const sub = subRes.subscription;
+      const isExpired = sub?.endDate && new Date(sub.endDate) < new Date();
+      setMySub(isExpired ? null : sub);
     } catch (err) {
       console.error("Dashboard fetch error:", err);
     } finally {
@@ -180,8 +175,9 @@ export function Dashboard() {
     navigate("/login");
   };
 
-  const currentPlanSlug = mySub?.planId?.slug ?? "free";
-  const currentPlanName = mySub?.planId?.name ?? "Free";
+  const activeSub = mySub?.status === "active" ? mySub : null;
+  const currentPlanSlug = activeSub?.planId?.slug ?? "free";
+  const currentPlanName = activeSub?.planId?.name ?? "Free";
 
   if (loading) {
     return (
@@ -474,7 +470,7 @@ function TabBuyPlan({
       )} */}
 
       {plans
-        .filter((p) => (currentPlanSlug === "free" ? p.isActive : true))
+        .filter((p) => p.isActive)
         .map((plan) => {
           const isCurrent = plan.slug === currentPlanSlug;
           const color = planColor(plan.slug);
