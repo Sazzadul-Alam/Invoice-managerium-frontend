@@ -23,6 +23,9 @@ export function ProductManagement({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ApiProduct | null>(null);
   
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -123,7 +126,17 @@ export function ProductManagement({
       showToast("Please fill all required fields", "error");
       return;
     }
-    // the required at least one image check has been removed
+
+    // Block if duplicate name exists (skip check when editing same product)
+    const isDupe = products.some(
+      (p) =>
+        p.name.toLowerCase().trim() === formData.name.toLowerCase().trim() &&
+        p._id !== editingProduct?._id
+    );
+    if (isDupe) {
+      setModalError(`A product named "${formData.name}" already exists.`);
+      return;
+    }
 
     setIsSubmitting(true);
     const fd = new FormData();
@@ -202,16 +215,36 @@ export function ProductManagement({
         </button>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative mb-4">
+        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-ds-outline text-lg pointer-events-none">search</span>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search products by name..."
+          className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-ds-outline-variant bg-ds-surface-container-low text-sm focus:outline-none focus:border-ds-primary-container transition-all"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-ds-outline hover:text-ds-on-surface transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        )}
+      </div>
+
       {loading ? (
         <div className="text-center py-10 text-ds-outline animate-pulse">Loading products...</div>
       ) : (
         <div className="space-y-3">
-          {products.length === 0 ? (
+          {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
             <div className="text-center py-10 text-sm text-ds-outline bg-ds-surface-container-lowest border rounded-2xl">
-              No products found. Create your first one!
+              {searchQuery ? `No products match "${searchQuery}"` : "No products found. Create your first one!"}
             </div>
           ) : (
-            products.map((product) => (
+            products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map((product) => (
               <div
                 key={product._id}
                 className="rounded-2xl border p-4 flex items-center gap-4 transition-all hover:shadow-sm"
@@ -361,10 +394,32 @@ export function ProductManagement({
                   required
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-ds-primary text-sm"
-                  style={{ background: "var(--ds-surface-container-highest)", borderColor: "var(--ds-outline-variant)" }}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    setModalError(null);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border focus:outline-none text-sm transition-all"
+                  style={{
+                    background: "var(--ds-surface-container-highest)",
+                    borderColor: products.some(
+                      (p) =>
+                        p.name.toLowerCase().trim() === formData.name.toLowerCase().trim() &&
+                        p._id !== editingProduct?._id
+                    ) && formData.name
+                      ? "var(--ds-error, #d32f2f)"
+                      : "var(--ds-outline-variant)",
+                  }}
                 />
+                {products.some(
+                  (p) =>
+                    p.name.toLowerCase().trim() === formData.name.toLowerCase().trim() &&
+                    p._id !== editingProduct?._id
+                ) && formData.name && (
+                  <p className="mt-1 text-[11px] font-semibold flex items-center gap-1" style={{ color: "var(--ds-error, #d32f2f)" }}>
+                    <span className="material-symbols-outlined text-[13px]">warning</span>
+                    A product with this name already exists.
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-3">
