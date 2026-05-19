@@ -117,7 +117,7 @@ export function InvoiceTemplate({
             <p style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: "#000000" }}>
               Billed To
             </p>
-            
+
             {(customerName || customerPhone) && (
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
                 {customerName && (
@@ -132,7 +132,7 @@ export function InvoiceTemplate({
                 )}
               </div>
             )}
-            
+
             {customerAddress && (
               <p style={{ fontSize: "11px", color: "#000000", fontWeight: 500, lineHeight: "1.3", wordBreak: "break-word" }}>
                 Address: {customerAddress}
@@ -249,9 +249,6 @@ export function InvoiceTemplate({
         <div style={{ textAlign: "center", padding: "10px 4px", display: "flex", flexDirection: "column", gap: "6px" }}>
           <p style={{ fontSize: "10px", color: "#000000", fontWeight: 700 }}>
             {footerText || "Thank you for your purchase!"}
-          </p>
-          <p style={{ fontSize: "9px", color: "#000000", fontWeight: 400, fontStyle: "italic", marginTop: "2px" }}>
-            Contact Support: 01605742247
           </p>
 
           {/* Social links */}

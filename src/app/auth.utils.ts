@@ -697,12 +697,12 @@ export const brandApi = {
 const PRODUCT_BASE = `${API_BASE}/product`;
 
 export const productApi = {
-  getAll: (demoOnly = false, shopId?: string, page = 1, limit = 10) => {
+  getAll: (demoOnly = false, shopId?: string, page = 1, limit?: number) => {
     const params = new URLSearchParams();
     if (demoOnly) params.set("demoOnly", "true");
     if (shopId) params.set("shopId", shopId);
     params.set("page", String(page));
-    params.set("limit", String(limit));
+    if (limit) params.set("limit", String(limit));
     return authedGet<{ success: boolean; products: ApiProduct[]; total: number }>(
       `${PRODUCT_BASE}/all?${params.toString()}`
     );

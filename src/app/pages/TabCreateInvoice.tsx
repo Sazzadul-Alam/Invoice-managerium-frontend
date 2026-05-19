@@ -99,7 +99,7 @@ export function TabCreateInvoice({
   const addToCart = (product: ApiProduct) => {
     setCart((prev) => [
       ...prev,
-      { cartItemId: Math.random().toString(36).substring(2, 9), product, quantity: 1, variety: "M" }
+      { cartItemId: Math.random().toString(36).substring(2, 9), product, quantity: 1, variety: "" }
     ]);
     setSearchQuery("");
   };
@@ -353,17 +353,13 @@ export function TabCreateInvoice({
                 
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <select 
-                      value={item.variety || "M"} 
+                    <input
+                      type="text"
+                      value={item.variety || ""}
                       onChange={(e) => updateVariety(item.cartItemId, e.target.value)}
-                      className="appearance-none text-[10px] font-bold bg-ds-surface-container-low text-ds-on-surface border border-ds-outline-variant/50 rounded-lg pl-2 pr-6 py-1.5 outline-none focus:border-ds-primary/30 transition-all cursor-pointer"
-                    >
-                      <option value="M">M</option>
-                      <option value="L">L</option>
-                      <option value="XL">XL</option>
-                      <option value="XXL">XXL</option>
-                    </select>
-                    <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[14px] pointer-events-none text-ds-outline">unfold_more</span>
+                      placeholder="Size"
+                      className="text-[10px] font-bold bg-ds-surface-container-low text-ds-on-surface border border-ds-outline-variant/50 rounded-lg px-2 py-1.5 outline-none focus:border-ds-primary/30 transition-all w-14 text-center"
+                    />
                   </div>
                   
                   <div className="flex items-center bg-ds-surface-container-low border border-ds-outline-variant/50 rounded-lg p-0.5">

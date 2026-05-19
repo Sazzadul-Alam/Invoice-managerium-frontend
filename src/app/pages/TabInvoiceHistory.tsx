@@ -25,6 +25,7 @@ export function TabInvoiceHistory({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [filterDate, setFilterDate] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const limit = 10;
 
 
@@ -130,10 +131,10 @@ export function TabInvoiceHistory({
           await invoiceApi.updateStatus(shop._id, id, "printed");
         }
       }
-      
+
       // Local update to UI
       setInvoices(prev => prev.map(i => selectedIds.includes(i._id) ? { ...i, status: "printed" } : i));
-      
+
       setIsPrintingMultiple(true);
       // Give it a full second to render all selected templates in the background
       setTimeout(() => {
@@ -159,7 +160,7 @@ export function TabInvoiceHistory({
           setPreviewInvoice({ ...previewInvoice, status: "printed" });
         }
       }
-      
+
       // Trigger browser print
       setTimeout(() => window.print(), 300);
     } catch (err: any) {
@@ -200,6 +201,16 @@ export function TabInvoiceHistory({
       onEditInvoice(inv);
     }
   };
+
+  const filteredInvoices = invoices.filter(inv => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      inv.invoiceNumber?.toLowerCase().includes(q) ||
+      inv.customerPhone?.toLowerCase().includes(q) ||
+      inv.customerAddress?.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <>
@@ -288,29 +299,42 @@ export function TabInvoiceHistory({
 
 
 
+        {/* Search Bar */}
+        <div className="relative">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-ds-outline text-lg pointer-events-none">search</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by phone, address"
+            className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-ds-outline-variant bg-ds-surface-container-low text-sm focus:outline-none focus:border-ds-primary-container transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-ds-outline hover:text-ds-on-surface transition-colors"
+            >
+              <span className="material-symbols-outlined text-lg">close</span>
+            </button>
+          )}
+        </div>
+
         {/* List */}
         {loading ? (
           <div className="py-10 flex justify-center">
             <span className="h-6 w-6 border-2 border-ds-outline-variant border-t-ds-primary-container rounded-full animate-spin" />
           </div>
-        ) : invoices.length === 0 ? (
+        ) : filteredInvoices.length === 0 ? (
           <div className="py-10 text-center border rounded-2xl border-ds-outline-variant bg-ds-surface-container-lowest">
             <span className="material-symbols-outlined text-4xl text-ds-outline mb-2">receipt_long</span>
-            <p className="text-sm font-semibold text-ds-on-surface-variant">No invoices found</p>
-            <p className="text-[11px] text-ds-outline mt-1 max-w-[200px] mx-auto">Create an invoice to see it listed here.</p>
+            <p className="text-sm font-semibold text-ds-on-surface-variant">
+              {searchQuery ? `No invoices match "${searchQuery}"` : "No invoices found"}
+            </p>
+            {!searchQuery && <p className="text-[11px] text-ds-outline mt-1 max-w-[200px] mx-auto">Create an invoice to see it listed here.</p>}
           </div>
         ) : (
           <div className="space-y-3">
-            {/* <div className="flex items-center gap-2 px-1"> */}
-            {/* <input
-                type="checkbox"
-                checked={selectedIds.length === invoices.length && invoices.length > 0}
-                onChange={toggleSelectAll}
-                className="h-4 w-4 rounded border-ds-outline-variant text-ds-primary focus:ring-ds-primary"
-              /> */}
-            {/* <span className="text-xs font-bold text-ds-outline uppercase tracking-wider">Select All</span> */}
-            {/* </div> */}
-            {invoices.map((inv) => {
+            {filteredInvoices.map((inv) => {
               const colors = getStatusColor(inv.status);
               const isSelected = selectedIds.includes(inv._id);
               return (
@@ -318,12 +342,10 @@ export function TabInvoiceHistory({
                   key={inv._id}
                   onClick={() => {
                     if (selectedIds.length > 0) {
-                      // If we are in "selection mode" (any checkbox checked), regular tap toggles selection
                       setSelectedIds(prev =>
                         prev.includes(inv._id) ? prev.filter(i => i !== inv._id) : [...prev, inv._id]
                       );
                     } else {
-                      // Normal mode: regular tap opens preview
                       setPreviewInvoice(inv);
                     }
                   }}
@@ -333,7 +355,7 @@ export function TabInvoiceHistory({
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      onChange={() => { }} // Handled by div onClick
+                      onChange={() => { }}
                       className="h-4 w-4 rounded border-ds-outline-variant text-ds-primary focus:ring-ds-primary"
                     />
                   </div>
@@ -384,7 +406,6 @@ export function TabInvoiceHistory({
             })}
           </div>
         )}
-
         {/* Pagination bar - Sticky Bottom mobile style */}
         {!loading && totalPages > 1 && (
           <div className="flex items-center justify-between py-4 border-t border-ds-outline-variant/30 mt-4">
