@@ -136,9 +136,12 @@ export function TabCreateInvoice({
       showToast("Add at least one product to the invoice.", "error");
       return;
     }
-    if (customerPhone && customerPhone.length !== 11) {
-      showToast("Customer phone must be exactly 11 digits.", "error");
-      return;
+    if (customerPhone) {
+      const phones = customerPhone.split(/[,\s]+/).map(p => p.trim()).filter(Boolean);
+      if (phones.some(p => p.length !== 11)) {
+        showToast("Each phone number must be exactly 11 digits (separate multiple numbers with commas).", "error");
+        return;
+      }
     }
     setSaving(true);
     let success = false;
@@ -220,9 +223,12 @@ export function TabCreateInvoice({
       showToast("Add at least one product to the invoice.", "error");
       return;
     }
-    if (customerPhone && customerPhone.length !== 11) {
-      showToast("Customer phone must be exactly 11 digits.", "error");
-      return;
+    if (customerPhone) {
+      const phones = customerPhone.split(/[,\s]+/).map(p => p.trim()).filter(Boolean);
+      if (phones.some(p => p.length !== 11)) {
+        showToast("Each phone number must be exactly 11 digits (separate multiple numbers with commas).", "error");
+        return;
+      }
     }
     try {
       const items = cart.map(c => {
@@ -347,19 +353,22 @@ export function TabCreateInvoice({
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Phone</label>
               <input
-                type="tel"
+                type="text"
                 inputMode="numeric"
                 value={customerPhone}
-                onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
-                placeholder="01XXXXXXXXX"
-                maxLength={11}
+                onChange={e => setCustomerPhone(e.target.value.replace(/[^\d, ]/g, ""))}
+                placeholder="01XXXXXXXXX or 01XXX…, 01XXX…"
                 className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container"
               />
-              {customerPhone.length > 0 && customerPhone.length !== 11 && (
-                <p className="mt-1 text-[10px] text-ds-error font-semibold">
-                  Phone must be exactly 11 digits ({customerPhone.length}/11)
-                </p>
-              )}
+              {customerPhone.length > 0 && (() => {
+                const phones = customerPhone.split(/[,\s]+/).map(p => p.trim()).filter(Boolean);
+                const invalid = phones.filter(p => p.length > 0 && p.length !== 11);
+                return invalid.length > 0 ? (
+                  <p className="mt-1 text-[10px] text-ds-error font-semibold">
+                    Each number must be 11 digits. Separate multiple with commas.
+                  </p>
+                ) : null;
+              })()}
             </div>
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Email (Optional)</label>

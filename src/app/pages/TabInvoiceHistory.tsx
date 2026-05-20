@@ -258,7 +258,7 @@ export function TabInvoiceHistory({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, invoice number..."
+            placeholder="Search by name, phone, invoice number..."
             className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-ds-outline-variant bg-ds-surface-container-low text-sm focus:outline-none focus:border-ds-primary-container transition-all"
           />
           {searchQuery && (
