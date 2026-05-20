@@ -202,13 +202,13 @@ export function TabCreateInvoice({
           setTimeout(() => {
             window.print();
             setTimeout(() => {
-              setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
+              setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setDeliveryCharge(0); setIsDeliveryPaid(false); setNotes("");
               setLastSavedInvoice(null);
               if (editInvoice && onCancelEdit) onCancelEdit();
             }, 1000);
           }, 500);
         } else {
-          setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
+          setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setDeliveryCharge(0); setIsDeliveryPaid(false); setNotes("");
           if (editInvoice && onCancelEdit) onCancelEdit();
         }
       } else {
@@ -276,7 +276,7 @@ export function TabCreateInvoice({
 
       showToast("Invoice exported as image!", "success");
       setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail("");
-      setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
+      setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setDeliveryCharge(0); setIsDeliveryPaid(false); setNotes("");
       if (editInvoice && onCancelEdit) onCancelEdit();
     } catch (err: any) {
       showToast(err.message || "Export failed", "error");
@@ -519,7 +519,7 @@ export function TabCreateInvoice({
                 <input
                   type="checkbox"
                   checked={isDeliveryPaid}
-                  onChange={(e) => setIsDeliveryPaid(e.target.checked)}
+                  onChange={(e) => { setIsDeliveryPaid(e.target.checked); if (e.target.checked) setDeliveryCharge(0); }}
                   className="w-4 h-4 rounded-full border-ds-outline-variant text-ds-primary focus:ring-ds-primary cursor-pointer"
                   style={{ borderRadius: "50%" }}
                 />
