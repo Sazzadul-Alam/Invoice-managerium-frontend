@@ -24,7 +24,6 @@ const ACTIVE_SUBSCRIPTION_TABS = [
   { key: "create_invoice", icon: "add_shopping_cart", label: "Create Invoice" },
   { key: "products", icon: "inventory_2", label: "Products" },
   { key: "history", icon: "history", label: "Invoice History" },
-  { key: "plan", icon: "workspace_premium", label: "Buy Plan" },
   { key: "profile", icon: "manage_accounts", label: "Profile" },
 ];
 
@@ -179,6 +178,12 @@ export function Dashboard() {
   const currentPlanSlug = activeSub?.planId?.slug ?? "free";
   const currentPlanName = activeSub?.planId?.name ?? "Free";
 
+  // Days until subscription ends (only show banner when ≤ 5 days remain)
+  const daysUntilExpiry = activeSub?.endDate
+    ? Math.ceil((new Date(activeSub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+  const showExpiryWarning = daysUntilExpiry !== null && daysUntilExpiry <= 5 && daysUntilExpiry >= 0;
+
   if (loading) {
     return (
       <div
@@ -217,6 +222,21 @@ export function Dashboard() {
           </div>
 
           <div className="flex items-center gap-1">
+            {showExpiryWarning && (
+              <button
+                onClick={() => navigate("/dashboard/plan")}
+                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors animate-pulse"
+                title={
+                  daysUntilExpiry === 0
+                    ? "Your subscription ends today — tap to renew"
+                    : daysUntilExpiry === 1
+                      ? "Your subscription ends tomorrow — tap to renew"
+                      : `Your subscription ends in ${daysUntilExpiry} days — tap to renew`
+                }
+              >
+                {daysUntilExpiry === 0 ? "Ends today" : `${daysUntilExpiry}d left`}
+              </button>
+            )}
             {/* Plan badge */}
             <span
               className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
@@ -295,7 +315,7 @@ export function Dashboard() {
         }}
       >
         <div className="max-w-lg mx-auto flex items-stretch h-16">
-          {BASE_TABS.map((tabItem) => {
+          {(activeSub ? ACTIVE_SUBSCRIPTION_TABS : BASE_TABS).map((tabItem) => {
             const active = tabItem.key === activeTab;
             return (
               <button
@@ -627,7 +647,7 @@ function TabBuyPlan({
 
       {toast && (
         <div
-          className="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-semibold shadow-lg z-50 transition-all"
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl text-sm font-semibold shadow-lg z-[200] transition-all"
           style={{ background: "var(--ds-on-surface)", color: "var(--ds-surface-container-lowest)" }}
         >
           {toast}
@@ -664,6 +684,7 @@ function TabProfile({
   onGoToBuyPlan?: () => void;
 }) {
   const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [editShopOpen, setEditShopOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [verifyLoading, setVerifyLoading] = useState(false);
@@ -696,12 +717,85 @@ function TabProfile({
     })
     : "—";
 
+  const isActive = mySub?.status === "active";
+
+  const InfoRow = ({ icon, label, value, sub }: { icon: string; label: string; value: string; sub?: string }) => (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span
+        className="material-symbols-outlined text-[20px] flex-shrink-0"
+        style={{ color: "var(--ds-primary-container)", fontVariationSettings: "'FILL' 1" }}
+      >
+        {icon}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] text-ds-outline font-semibold uppercase tracking-wider">{label}</p>
+        <p className="text-sm font-semibold text-ds-on-surface mt-0.5 truncate">{value}</p>
+        {sub && <p className="text-[10px] text-ds-outline mt-0.5">{sub}</p>}
+      </div>
+    </div>
+  );
+
+  const ActionRow = ({
+    icon,
+    label,
+    onClick,
+    accent,
+    danger,
+  }: {
+    icon: string;
+    label: string;
+    onClick: () => void;
+    accent?: boolean;
+    danger?: boolean;
+  }) => (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ds-surface-container-low active:bg-ds-surface-container"
+    >
+      <span
+        className="material-symbols-outlined text-[20px] flex-shrink-0"
+        style={{
+          color: danger
+            ? "var(--ds-error)"
+            : accent
+              ? "#b8860b"
+              : "var(--ds-on-surface-variant)",
+        }}
+      >
+        {icon}
+      </span>
+      <span
+        className="text-sm font-semibold flex-1 text-left"
+        style={{
+          color: danger
+            ? "var(--ds-error)"
+            : accent
+              ? "#8a6a00"
+              : "var(--ds-on-surface)",
+        }}
+      >
+        {label}
+      </span>
+      <span className="material-symbols-outlined text-base text-ds-outline-variant">chevron_right</span>
+    </button>
+  );
+
+  const sectionCardStyle = {
+    background: "var(--ds-surface-container-lowest)",
+    borderColor: "var(--ds-outline-variant)",
+  };
+
+  const shopAddress = [
+    shop?.address?.address_line1,
+    shop?.address?.city,
+  ].filter(Boolean).join(", ");
+
   return (
-    <div className="px-4 pt-5 pb-4 space-y-4 relative">
+    <div className="pt-5 pb-4 relative space-y-4" style={{ background: "var(--ds-background)" }}>
       {/* Toast notification */}
       {toast && (
         <div
-          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium max-w-sm animate-in"
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-[200] px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium max-w-sm animate-in"
           style={{
             background: toast.type === "success" ? "var(--ds-secondary-container)" : "var(--ds-error-container)",
             color: toast.type === "success" ? "var(--ds-on-secondary-container)" : "var(--ds-on-error-container)",
@@ -714,230 +808,194 @@ function TabProfile({
         </div>
       )}
 
-      {/* Avatar + name */}
-      <div
-        className="rounded-2xl p-5 flex items-center gap-4 border"
-        style={{
-          background: "var(--ds-surface-container-lowest)",
-          borderColor: "var(--ds-outline-variant)",
-        }}
-      >
-        <div
-          className="h-14 w-14 rounded-2xl flex items-center justify-center text-2xl font-extrabold text-white flex-shrink-0 overflow-hidden"
-          style={{ background: "var(--ds-primary-container)" }}
+      {/* ── Identity ── */}
+      <div className="mx-4 rounded-2xl border overflow-hidden relative" style={sectionCardStyle}>
+        <button
+          onClick={() => setEditProfileOpen(true)}
+          className="absolute top-3 right-3 p-2 rounded-full hover:bg-ds-surface-container-high transition-colors z-10"
+          title="Edit personal info"
+          aria-label="Edit personal info"
         >
-          {user?.image ? (
-            <img
-              src={user.image.startsWith("http") ? user.image : `https://api.memobook.shop/uploads/image/${user.image}`}
-              alt="Avatar"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            (user?.name ?? "U").charAt(0).toUpperCase()
+          <span className="material-symbols-outlined text-[18px] text-ds-primary-container">edit</span>
+        </button>
+        <div className="p-5 flex items-center gap-4">
+          <div
+            className="h-16 w-16 rounded-2xl flex items-center justify-center text-2xl font-extrabold text-white flex-shrink-0 overflow-hidden"
+            style={{ background: "var(--ds-primary-container)" }}
+          >
+            {user?.image ? (
+              <img
+                src={user.image.startsWith("http") ? user.image : `https://api.memobook.shop/uploads/image/${user.image}`}
+                alt="Avatar"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              (user?.name ?? "U").charAt(0).toUpperCase()
+            )}
+          </div>
+          <div className="flex-1 min-w-0 pr-8">
+            <p
+              className="text-ds-on-surface font-extrabold text-base truncate"
+              style={{ fontFamily: "'Manrope', sans-serif" }}
+            >
+              {user?.name ?? "—"}
+            </p>
+            <p className="text-ds-outline text-xs truncate mt-0.5">{user?.email ?? "No email"}</p>
+            <p className="text-ds-outline text-xs truncate mt-0.5">{user?.phone || "No phone"}</p>
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              <span
+                className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(0,92,114,0.08)", color: "var(--ds-primary-container)" }}
+              >
+                Shop Owner
+              </span>
+              {user?.isVerified && (
+                <span
+                  className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-0.5"
+                  style={{ background: "rgba(0,128,0,0.08)", color: "#2e7d32" }}
+                >
+                  <span
+                    className="material-symbols-outlined text-[10px]"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    verified
+                  </span>
+                  Verified
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Change Password ── */}
+      <div className="mx-4 rounded-2xl border overflow-hidden" style={sectionCardStyle}>
+        <ActionRow icon="lock" label="Change password" onClick={() => setChangePasswordOpen(true)} />
+      </div>
+
+      {/* ── Subscription ── */}
+      <div className="mx-4 rounded-2xl border divide-y divide-ds-outline-variant overflow-hidden" style={sectionCardStyle}>
+        <InfoRow icon="calendar_today" label="Member since" value={memberSince} />
+        <InfoRow
+          icon="workspace_premium"
+          label="Current plan"
+          value={`${currentPlanName} Plan`}
+          sub={mySub?.endDate ? `Expires ${subExpiry}` : undefined}
+        />
+        <button
+          onClick={() => onGoToBuyPlan?.()}
+          className="w-full flex items-center gap-3 px-4 py-3.5 transition-all active:scale-[0.98] hover:brightness-105"
+          style={{
+            background: "linear-gradient(135deg, #f6c34a 0%, #e8a735 60%, #c8841a 100%)",
+            boxShadow: "inset 0 -1px 0 rgba(0,0,0,0.08)",
+          }}
+        >
+          <span className="material-symbols-outlined text-[20px] text-white flex-shrink-0 drop-shadow-sm">
+            auto_awesome
+          </span>
+          <span className="text-sm font-extrabold flex-1 text-left text-white tracking-wide drop-shadow-sm">
+            {isActive ? "Upgrade Plan" : "Get Premium"}
+          </span>
+          <span className="material-symbols-outlined text-base text-white/90">chevron_right</span>
+        </button>
+      </div>
+
+      {/* ── Shop ── */}
+      <div className="mx-4 rounded-2xl border overflow-hidden" style={sectionCardStyle}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-ds-outline-variant">
+          <div className="flex items-center gap-2">
+            <span
+              className="material-symbols-outlined text-[20px]"
+              style={{ color: "var(--ds-primary-container)", fontVariationSettings: "'FILL' 1" }}
+            >
+              storefront
+            </span>
+            <p className="text-sm font-bold text-ds-on-surface" style={{ fontFamily: "'Manrope', sans-serif" }}>
+              Shop
+            </p>
+          </div>
+          {shop && (
+            <button
+              onClick={() => setEditShopOpen(true)}
+              className="p-2 -mr-1 rounded-full hover:bg-ds-surface-container-high transition-colors"
+              title="Edit shop"
+              aria-label="Edit shop"
+            >
+              <span className="material-symbols-outlined text-[18px] text-ds-primary-container">edit</span>
+            </button>
           )}
         </div>
-        <div className="flex-1 min-w-0">
-          <p
-            className="text-ds-on-surface font-extrabold text-base truncate"
-            style={{ fontFamily: "'Manrope', sans-serif" }}
-          >
-            {user?.name ?? "—"}
-          </p>
-          <p className="text-ds-outline text-xs truncate mt-0.5">
-            {user?.email ?? "No email"}
-          </p>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span
-              className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-              style={{
-                background: "rgba(0,92,114,0.08)",
-                color: "var(--ds-primary-container)",
-              }}
+        {shop ? (
+          <div className="px-4 py-4 space-y-3">
+            <p
+              className="text-base font-extrabold text-ds-on-surface tracking-tight"
+              style={{ fontFamily: "'Manrope', sans-serif" }}
             >
-              Shop Owner
-            </span>
-            {user?.isVerified && (
-              <span
-                className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-0.5"
-                style={{
-                  background: "rgba(0,128,0,0.08)",
-                  color: "#2e7d32",
-                }}
-              >
-                <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  verified
-                </span>
-                Verified
+              {shop.name}
+            </p>
+            <div className="grid grid-cols-[20px_1fr] gap-x-2.5 gap-y-2.5 text-[13px] text-ds-on-surface-variant items-start">
+              <span className="material-symbols-outlined text-[18px] text-ds-primary-container leading-[20px]">call</span>
+              <span className="font-semibold leading-[20px] tabular-nums tracking-wide">
+                {shop.contactNumber || <span className="text-ds-outline font-normal italic">Not set</span>}
               </span>
-            )}
+              <span className="material-symbols-outlined text-[18px] text-ds-primary-container leading-[20px]">location_on</span>
+              <span className="font-medium leading-[20px]">
+                {shopAddress || <span className="text-ds-outline font-normal italic">No address set</span>}
+              </span>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Email verification notice */}
-      {/* {user && !user.isVerified && (
-        <div
-          className="rounded-xl px-4 py-3.5 flex items-center gap-3 border"
-          style={{
-            background: "rgba(254,187,125,0.10)",
-            borderColor: "var(--ds-on-tertiary-container)",
-          }}
-        >
-          <span
-            className="material-symbols-outlined text-xl flex-shrink-0"
-            style={{
-              color: "var(--ds-tertiary)",
-              fontVariationSettings: "'FILL' 1",
-            }}
-          >
-            mark_email_unread
-          </span>
-          <div className="flex-1">
-            <p className="text-xs font-semibold text-ds-on-surface">
-              Email not verified
-            </p>
-            <p className="text-[11px] text-ds-on-surface-variant mt-0.5">
-              Verify your email to secure your account.
-            </p>
-          </div>
-          <button
-            onClick={handleResendVerification}
-            disabled={verifyLoading}
-            className="text-xs font-bold px-2.5 py-1.5 rounded-lg text-white flex-shrink-0 disabled:opacity-50"
-            style={{ background: "var(--ds-tertiary)" }}
-          >
-            {verifyLoading ? "Sending…" : "Verify"}
-          </button>
-        </div>
-      )} */}
-
-      {/* Info tiles */}
-      {[
-        {
-          icon: "storefront",
-          label: "Shop Name",
-          value: shop?.name ?? "No shop yet",
-        },
-        {
-          icon: "badge",
-          label: "Account Type",
-          value: `${currentPlanName} Plan`,
-          sub: mySub?.endDate ? `Expires ${subExpiry}` : undefined,
-        },
-        {
-          icon: "calendar_today",
-          label: "Member Since",
-          value: memberSince,
-        },
-        {
-          icon: "phone",
-          label: "Phone",
-          value: user?.phone || "Not set",
-        },
-      ].map((row) => (
-        <div
-          key={row.label}
-          className="rounded-xl px-4 py-3.5 flex items-center gap-3 border"
-          style={{
-            background: "var(--ds-surface-container-lowest)",
-            borderColor: "var(--ds-outline-variant)",
-          }}
-        >
-          <span
-            className="material-symbols-outlined text-xl"
-            style={{ color: "var(--ds-primary-container)", fontVariationSettings: "'FILL' 1" }}
-          >
-            {row.icon}
-          </span>
-          <div className="flex-1">
-            <p className="text-[10px] text-ds-outline font-semibold uppercase tracking-wider">
-              {row.label}
-            </p>
-            <p className="text-sm font-semibold text-ds-on-surface mt-0.5">{row.value}</p>
-            {row.sub && (
-              <p className="text-[10px] text-ds-outline mt-0.5">{row.sub}</p>
-            )}
-          </div>
-          <span className="material-symbols-outlined text-base text-ds-outline-variant">
-            chevron_right
-          </span>
-        </div>
-      ))}
-
-      {/* Settings row */}
-      <div className="pt-1 space-y-2">
-        {mySub?.status === "active" && (
-          <button
-            onClick={onGoToBuyPlan}
-            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98] mb-2"
-            style={{
-              background: "rgba(232, 167, 53, 0.08)",
-              borderColor: "var(--ds-on-tertiary-container)",
-            }}
-          >
-            <span className="material-symbols-outlined text-xl text-yellow-600">
-              arrow_upward
-            </span>
-            <span className="text-sm font-medium text-yellow-700 flex-1 text-left">
-              Upgrade Subscription Plan
-            </span>
-            <span className="material-symbols-outlined text-base text-yellow-700">
-              chevron_right
-            </span>
-          </button>
+        ) : (
+          <div className="px-4 py-5 text-sm text-ds-outline text-center">No shop yet</div>
         )}
-        {[
-          { icon: "edit", label: "Edit Profile", action: () => setEditProfileOpen(true) },
-          { icon: "lock", label: "Change Password", action: () => setChangePasswordOpen(true) },
-          { icon: "help", label: "Help & Support", action: () => setHelpOpen(true) },
-        ].map((item) => (
-          <button
-            key={item.label}
-            onClick={item.action}
-            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98]"
-            style={{
-              background: "var(--ds-surface-container-lowest)",
-              borderColor: "var(--ds-outline-variant)",
-            }}
-          >
-            <span className="material-symbols-outlined text-xl text-ds-on-surface-variant">
-              {item.icon}
-            </span>
-            <span className="text-sm font-medium text-ds-on-surface flex-1 text-left">
-              {item.label}
-            </span>
-            <span className="material-symbols-outlined text-base text-ds-outline-variant">
-              chevron_right
-            </span>
-          </button>
-        ))}
       </div>
 
-      {/* Logout */}
-      <button
-        onClick={onLogout}
-        className="w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border transition-all active:scale-[0.98]"
-        style={{
-          color: "var(--ds-error)",
-          borderColor: "var(--ds-error)",
-          background: "rgba(186,26,26,0.04)",
-        }}
-      >
-        <span className="material-symbols-outlined text-xl">logout</span>
-        Logout
-      </button>
+      {/* ── Support ── */}
+      <div className="mx-4 rounded-2xl border overflow-hidden" style={sectionCardStyle}>
+        <ActionRow icon="help" label="Help & support" onClick={() => setHelpOpen(true)} />
+      </div>
+
+      {/* ── Sign out ── */}
+      <div className="mx-4 mt-6">
+        <button
+          onClick={onLogout}
+          className="w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border transition-all active:scale-[0.98]"
+          style={{
+            color: "var(--ds-error)",
+            borderColor: "var(--ds-error)",
+            background: "rgba(186,26,26,0.04)",
+          }}
+        >
+          <span className="material-symbols-outlined text-xl">logout</span>
+          Sign out
+        </button>
+      </div>
 
       {/* ── Modals ── */}
       {editProfileOpen && user && (
         <EditProfileModal
           user={user}
           shop={shop}
+          mode="personal"
           onClose={() => setEditProfileOpen(false)}
-          onSaved={(u, s) => {
+          onSaved={(u) => {
             onUserUpdated(u);
-            if (s) onShopUpdated(s);
             showToast("Profile updated!");
             setEditProfileOpen(false);
+          }}
+          onError={(msg) => showToast(msg, "error")}
+        />
+      )}
+
+      {editShopOpen && user && shop && (
+        <EditProfileModal
+          user={user}
+          shop={shop}
+          mode="shop"
+          onClose={() => setEditShopOpen(false)}
+          onSaved={(_u, s) => {
+            if (s) onShopUpdated(s);
+            showToast("Shop updated!");
+            setEditShopOpen(false);
           }}
           onError={(msg) => showToast(msg, "error")}
         />
@@ -968,12 +1026,14 @@ function TabProfile({
 function EditProfileModal({
   user,
   shop,
+  mode = "all",
   onClose,
   onSaved,
   onError,
 }: {
   user: ApiUser;
   shop: ApiShop | null;
+  mode?: "all" | "shop" | "personal";
   onClose: () => void;
   onSaved: (user: ApiUser, shop: ApiShop | null) => void;
   onError: (msg: string) => void;
@@ -992,14 +1052,17 @@ function EditProfileModal({
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Update user profile
-      const userRes = await authApi.updateProfile({ name, phone, bio });
-      // Update session storage too
-      sessionStorage.setItem("userName", name);
+      // Update user profile (only when editing personal info)
+      let userOut: ApiUser = user;
+      if (mode === "all" || mode === "personal") {
+        const userRes = await authApi.updateProfile({ name, phone, bio });
+        sessionStorage.setItem("userName", name);
+        userOut = userRes.user;
+      }
 
-      // Update shop if it exists
+      // Update shop only when editing shop info
       let updatedShop: ApiShop | null = null;
-      if (shop) {
+      if (shop && mode !== "personal") {
         const shopRes = await shopApi.updateShop(shop._id, {
           name: shopName,
           contactNumber: shopContact,
@@ -1015,7 +1078,7 @@ function EditProfileModal({
         updatedShop = shopRes.shop;
       }
 
-      onSaved(userRes.user, updatedShop);
+      onSaved(userOut, updatedShop);
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to update profile");
     } finally {
@@ -1043,7 +1106,7 @@ function EditProfileModal({
               className="text-lg font-extrabold text-ds-primary"
               style={{ fontFamily: "'Manrope', sans-serif" }}
             >
-              Edit Profile
+              {mode === "shop" ? "Edit Shop" : mode === "personal" ? "Edit Personal Info" : "Edit Profile"}
             </h3>
             <button
               onClick={onClose}
@@ -1054,15 +1117,19 @@ function EditProfileModal({
           </div>
 
           {/* User fields */}
-          <p className="text-[10px] font-bold uppercase tracking-wider text-ds-outline">Personal Info</p>
-          <InputField icon="person" label="Full Name" value={name} onChange={setName} />
-          <InputField icon="call" label="Phone" value={phone} onChange={setPhone} type="tel" />
-          <InputField icon="info" label="Bio" value={bio} onChange={setBio} multiline />
+          {mode !== "shop" && (
+            <>
+              {mode === "all" && <p className="text-[10px] font-bold uppercase tracking-wider text-ds-outline">Personal Info</p>}
+              <InputField icon="person" label="Full Name" value={name} onChange={setName} />
+              <InputField icon="call" label="Phone" value={phone} onChange={setPhone} type="tel" />
+              <InputField icon="info" label="Bio" value={bio} onChange={setBio} multiline />
+            </>
+          )}
 
           {/* Shop fields */}
-          {shop && (
+          {shop && mode !== "personal" && (
             <>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-ds-outline pt-2">Shop Info</p>
+              {mode === "all" && <p className="text-[10px] font-bold uppercase tracking-wider text-ds-outline pt-2">Shop Info</p>}
               <InputField icon="storefront" label="Shop Name" value={shopName} onChange={setShopName} />
               <InputField icon="call" label="Shop Phone" value={shopContact} onChange={setShopContact} type="tel" />
               <InputField icon="location_on" label="Address" value={shopAddr} onChange={setShopAddr} />
@@ -1356,7 +1423,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             {
               icon: "mail",
               title: "Email Support",
-              desc: "Reach us at support@kantoinvoice.com for any issues or feedback.",
+              desc: "Reach us at kanto065@gmail.com for any issues or feedback.",
             },
             {
               icon: "chat",

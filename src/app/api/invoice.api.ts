@@ -54,10 +54,11 @@ export const invoiceApi = {
       { status }
     ),
 
-  listInvoices: (shopId: string, page = 1, limit = 20, dateFrom?: string, dateTo?: string) => {
+  listInvoices: (shopId: string, page = 1, limit = 20, dateFrom?: string, dateTo?: string, search?: string) => {
     const query = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (dateFrom) query.set("dateFrom", dateFrom);
     if (dateTo) query.set("dateTo", dateTo);
+    if (search) query.set("search", search);
     return authedGet<{ success: boolean; invoices: ApiInvoice[]; total: number }>(
       `${INVOICE_BASE}/shop/${shopId}?${query.toString()}`
     );

@@ -30,40 +30,57 @@ export function TabInvoiceHistory({
   const [limit, setLimit] = useState(20);
 
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isPrintingMultiple, setIsPrintingMultiple] = useState(false);
-  const { isExporting, exportMany, ExportCaptureContainer } = useInvoiceExport(shop);
+  const { isExporting, exportOne, exportMany, ExportCaptureContainer } = useInvoiceExport(shop);
 
-
+  // Debounce: batch the page reset + search update so one fetch fires
   useEffect(() => {
-    if (shop) {
+    const timer = setTimeout(() => {
       setCurrentPage(1);
-      fetchInvoices(1, filterDateFrom, filterDateTo, limit);
-    }
-  }, [shop, filterDateFrom, filterDateTo, limit]);
+      setDebouncedSearch(searchQuery);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
+  // Reset page when date filters change
   useEffect(() => {
-    if (shop) {
-      fetchInvoices(currentPage, filterDateFrom, filterDateTo, limit);
-    }
-  }, [currentPage]);
+    setCurrentPage(1);
+  }, [filterDateFrom, filterDateTo]);
 
-
-
-
-  const fetchInvoices = async (page = currentPage, dateFrom = filterDateFrom, dateTo = filterDateTo, pageSize = limit) => {
+  // Single fetch effect — driven by all params at once, no cascade
+  useEffect(() => {
     if (!shop) return;
     setLoading(true);
-    try {
-      const res = await invoiceApi.listInvoices(shop._id, page, pageSize, dateFrom, dateTo);
-      setInvoices(res.invoices);
-      setTotalPages(Math.ceil((res.total || 0) / pageSize));
-    } catch (err: any) {
-      setToast({ msg: err.message || "Failed to load invoices", type: "error" });
-      setTimeout(() => setToast(null), 3000);
-    } finally {
-      setLoading(false);
-    }
+    invoiceApi
+      .listInvoices(shop._id, currentPage, limit, filterDateFrom, filterDateTo, debouncedSearch)
+      .then((res) => {
+        setInvoices(res.invoices);
+        setTotalPages(Math.ceil((res.total || 0) / limit));
+      })
+      .catch((err: any) => {
+        setToast({ msg: err.message || "Failed to load invoices", type: "error" });
+        setTimeout(() => setToast(null), 3000);
+      })
+      .finally(() => setLoading(false));
+  }, [shop?._id, currentPage, filterDateFrom, filterDateTo, limit, debouncedSearch]);
+
+  const fetchInvoices = () => {
+    if (!shop) return;
+    setLoading(true);
+    invoiceApi
+      .listInvoices(shop._id, currentPage, limit, filterDateFrom, filterDateTo, debouncedSearch)
+      .then((res) => {
+        setInvoices(res.invoices);
+        setTotalPages(Math.ceil((res.total || 0) / limit));
+      })
+      .catch((err: any) => {
+        setToast({ msg: err.message || "Failed to load invoices", type: "error" });
+        setTimeout(() => setToast(null), 3000);
+      })
+      .finally(() => setLoading(false));
   };
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
@@ -162,15 +179,6 @@ export function TabInvoiceHistory({
     }
   };
 
-  const filteredInvoices = invoices.filter(inv => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      inv.invoiceNumber?.toLowerCase().includes(q) ||
-      inv.customerPhone?.toLowerCase().includes(q) ||
-      inv.customerAddress?.toLowerCase().includes(q)
-    );
-  });
 
   return (
     <>
@@ -250,7 +258,7 @@ export function TabInvoiceHistory({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by phone, address"
+            placeholder="Search by name, invoice number..."
             className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-ds-outline-variant bg-ds-surface-container-low text-sm focus:outline-none focus:border-ds-primary-container transition-all"
           />
           {searchQuery && (
@@ -268,7 +276,7 @@ export function TabInvoiceHistory({
           <div className="py-10 flex justify-center">
             <span className="h-6 w-6 border-2 border-ds-outline-variant border-t-ds-primary-container rounded-full animate-spin" />
           </div>
-        ) : filteredInvoices.length === 0 ? (
+        ) : invoices.length === 0 ? (
           <div className="py-10 text-center border rounded-2xl border-ds-outline-variant bg-ds-surface-container-lowest">
             <span className="material-symbols-outlined text-4xl text-ds-outline mb-2">receipt_long</span>
             <p className="text-sm font-semibold text-ds-on-surface-variant">
@@ -502,8 +510,23 @@ export function TabInvoiceHistory({
                 Edit
               </button>
               <button
+                onClick={() => exportOne(previewInvoice)}
+                disabled={isExporting}
+                className="flex-1 py-3 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-60 flex items-center justify-center gap-2"
+                title="Export as image"
+              >
+                {isExporting ? (
+                  <span className="h-4 w-4 border-2 border-ds-primary/30 border-t-ds-primary rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">download</span>
+                    Export
+                  </>
+                )}
+              </button>
+              <button
                 onClick={() => handlePrint(previewInvoice)}
-                className="flex-[1.5] py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform flex justify-center items-center gap-2"
+                className="flex-1 py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform flex justify-center items-center gap-2"
                 style={{ background: "var(--ds-primary)" }}
               >
                 <span className="material-symbols-outlined text-[18px]">print</span>

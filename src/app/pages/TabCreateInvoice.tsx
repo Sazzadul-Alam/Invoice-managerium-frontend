@@ -136,6 +136,10 @@ export function TabCreateInvoice({
       showToast("Add at least one product to the invoice.", "error");
       return;
     }
+    if (customerPhone && customerPhone.length !== 11) {
+      showToast("Customer phone must be exactly 11 digits.", "error");
+      return;
+    }
     setSaving(true);
     let success = false;
     try {
@@ -197,12 +201,12 @@ export function TabCreateInvoice({
             setTimeout(() => {
               setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
               setLastSavedInvoice(null);
-              if (onCancelEdit) onCancelEdit();
+              if (editInvoice && onCancelEdit) onCancelEdit();
             }, 1000);
-          }, 500); 
+          }, 500);
         } else {
           setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
-          if (onCancelEdit) onCancelEdit();
+          if (editInvoice && onCancelEdit) onCancelEdit();
         }
       } else {
         setSaving(false);
@@ -214,6 +218,10 @@ export function TabCreateInvoice({
     if (!shop) return;
     if (cart.length === 0) {
       showToast("Add at least one product to the invoice.", "error");
+      return;
+    }
+    if (customerPhone && customerPhone.length !== 11) {
+      showToast("Customer phone must be exactly 11 digits.", "error");
       return;
     }
     try {
@@ -263,7 +271,7 @@ export function TabCreateInvoice({
       showToast("Invoice exported as image!", "success");
       setCart([]); setCustomerName(""); setCustomerPhone(""); setCustomerEmail("");
       setCustomerAddress(""); setDiscountValue(0); setAdvanceAmount(0); setNotes("");
-      if (onCancelEdit) onCancelEdit();
+      if (editInvoice && onCancelEdit) onCancelEdit();
     } catch (err: any) {
       showToast(err.message || "Export failed", "error");
     }
@@ -338,7 +346,20 @@ export function TabCreateInvoice({
             </div>
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Phone</label>
-              <input type="text" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="01XXX-XXXXXX" className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container" />
+              <input
+                type="tel"
+                inputMode="numeric"
+                value={customerPhone}
+                onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                placeholder="01XXXXXXXXX"
+                maxLength={11}
+                className="w-full rounded-lg border px-3 py-2 text-sm bg-ds-surface-container-low border-ds-outline-variant focus:outline-none focus:border-ds-primary-container"
+              />
+              {customerPhone.length > 0 && customerPhone.length !== 11 && (
+                <p className="mt-1 text-[10px] text-ds-error font-semibold">
+                  Phone must be exactly 11 digits ({customerPhone.length}/11)
+                </p>
+              )}
             </div>
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-[10px] font-bold uppercase text-ds-outline mb-1">Customer Email (Optional)</label>
@@ -635,14 +656,29 @@ export function TabCreateInvoice({
                 <button
                   onClick={() => { handleCreate(false); setPreviewOpen(false); }}
                   disabled={saving || cart.length === 0}
-                  className="flex-[1] py-3 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex items-center justify-center"
+                  className="flex-1 py-3 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex items-center justify-center"
                 >
                   Save
                 </button>
                 <button
+                  onClick={() => { handleExport(); setPreviewOpen(false); }}
+                  disabled={saving || isExporting || cart.length === 0}
+                  className="flex-1 py-3 rounded-xl border border-ds-primary text-ds-primary font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex items-center justify-center gap-2"
+                  title="Export as image"
+                >
+                  {isExporting ? (
+                    <span className="h-4 w-4 border-2 border-ds-primary/30 border-t-ds-primary rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[18px]">download</span>
+                      Export
+                    </>
+                  )}
+                </button>
+                <button
                   onClick={() => { handleCreate(true); setPreviewOpen(false); }}
                   disabled={saving || cart.length === 0}
-                  className="flex-[1.5] py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center gap-2"
+                  className="flex-1 py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-transform disabled:opacity-70 flex justify-center items-center gap-2"
                   style={{ background: "var(--ds-primary)" }}
                 >
                   <span className="material-symbols-outlined text-[18px]">print</span>

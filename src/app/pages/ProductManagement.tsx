@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { productApi, varientAttributeApi } from "../api/product.api";
 import type { ApiProduct, ApiUserSubscription, ApiShop } from "../types";
 
@@ -43,13 +43,16 @@ export function ProductManagement({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchPrimaryData = async (page = currentPage) => {
+  const searchRef = useRef(searchQuery);
+  searchRef.current = searchQuery;
+
+  const fetchPrimaryData = async (page = currentPage, search = searchRef.current) => {
     try {
       const isFreePlan = planName.toLowerCase() === "free";
 
       const [prodRes, demoRes, varRes] = await Promise.all([
-        shop?._id ? productApi.getAll(false, shop._id, page, limit) : Promise.resolve({ success: true, products: [], total: 0 }),
-        (!isFreePlan && page === 1) ? productApi.getAll(true) : Promise.resolve({ success: true, products: [], total: 0 }),
+        shop?._id ? productApi.getAll(false, shop._id, page, limit, search) : Promise.resolve({ success: true, products: [], total: 0 }),
+        (!isFreePlan && page === 1 && !search) ? productApi.getAll(true) : Promise.resolve({ success: true, products: [], total: 0 }),
         varientAttributeApi.getAll(),
       ]);
 
@@ -59,7 +62,7 @@ export function ProductManagement({
         setTotalPages(Math.ceil((prodRes.total || 0) / limit));
         setTotalProducts(prodRes.total || 0);
       }
-      
+
       if (demoRes.success && demoRes.products.length > 0) {
         finalProducts = [...finalProducts, ...demoRes.products];
       }
@@ -77,7 +80,7 @@ export function ProductManagement({
   useEffect(() => {
     if (shop?._id) {
       setCurrentPage(1);
-      fetchPrimaryData(1);
+      fetchPrimaryData(1, "");
     }
   }, [shop?._id]);
 
@@ -86,6 +89,16 @@ export function ProductManagement({
       fetchPrimaryData(currentPage);
     }
   }, [currentPage]);
+
+  // Debounced backend search — resets to page 1 on each new query
+  useEffect(() => {
+    if (!shop?._id) return;
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+      fetchPrimaryData(1, searchQuery);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const showToast = (msg: string, type: "success" | "error") => {
     setToast({ msg, type });
@@ -239,12 +252,12 @@ export function ProductManagement({
         <div className="text-center py-10 text-ds-outline animate-pulse">Loading products...</div>
       ) : (
         <div className="space-y-3">
-          {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+          {products.length === 0 ? (
             <div className="text-center py-10 text-sm text-ds-outline bg-ds-surface-container-lowest border rounded-2xl">
               {searchQuery ? `No products match "${searchQuery}"` : "No products found. Create your first one!"}
             </div>
           ) : (
-            products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map((product) => (
+            products.map((product) => (
               <div
                 key={product._id}
                 className="rounded-2xl border p-4 flex items-center gap-4 transition-all hover:shadow-sm"

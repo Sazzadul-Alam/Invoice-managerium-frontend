@@ -4,7 +4,7 @@ import { adminApi, billingCycleApi } from "../api/subscription.api";
 import { getToken, getRole, clearSession } from "../utils/session";
 import type { SubStats, PopulatedSubscription, ApiPlan, ApiBillingCycle } from "../types";
 
-/* ── tiny helpers ─────────────────────────────────────────────────── */
+/* ── helpers ─────────────────────────────────────────────────────── */
 const fmt = (n: number) => new Intl.NumberFormat("en-BD").format(n);
 const ago = (d: string) => {
   const s = (Date.now() - new Date(d).getTime()) / 1000;
@@ -21,6 +21,15 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "#ba1a1a",
 };
 
+const STATUS_BG: Record<string, string> = {
+  pending: "rgba(232,167,53,0.10)",
+  active: "rgba(46,204,113,0.10)",
+  expired: "rgba(112,120,125,0.10)",
+  cancelled: "rgba(186,26,26,0.10)",
+};
+
+const headlineFont = { fontFamily: "'Manrope', sans-serif" } as const;
+
 const TABS = ["overview", "pending", "all", "plans", "profile"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -34,7 +43,12 @@ export function AdminDashboard() {
   const [filter, setFilter] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2800);
+  };
 
   // guard
   useEffect(() => {
@@ -69,133 +83,138 @@ export function AdminDashboard() {
     setActing(id);
     try {
       const r = await adminApi.handleSubscription(id, action);
-      setToast(r.message);
-      setTimeout(() => setToast(""), 2600);
+      showToast(r.message);
       fetchSubs(filter);
       fetchStats();
-    } catch (e: any) { setToast(e.message); setTimeout(() => setToast(""), 2600); }
+    } catch (e: any) {
+      showToast(e.message, "error");
+    }
     setActing(null);
   };
 
   const logout = () => { clearSession(); navigate("/login"); };
 
-  /* ── icon helper ─────────────────────────────────────────────── */
-  const Icon = ({ name, style }: { name: string; style?: React.CSSProperties }) => (
-    <span className="material-symbols-outlined" style={{ fontSize: 22, ...style }}>{name}</span>
-  );
-
-  /* ── stat card ───────────────────────────────────────────────── */
-  const StatCard = ({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) => (
-    <div style={{
-      background: "var(--ds-surface-container-lowest)",
-      border: "1px solid var(--ds-outline-variant)",
-      borderRadius: 16, padding: "18px 16px",
-      display: "flex", alignItems: "center", gap: 14,
-      transition: "transform .15s", cursor: "default",
-    }}>
-      <div style={{
-        width: 44, height: 44, borderRadius: 12,
-        background: color + "18", display: "flex",
-        alignItems: "center", justifyContent: "center",
-      }}>
-        <Icon name={icon} style={{ color, fontSize: 24 }} />
+  /* ── Stat card ──────────────────────────────────────────────── */
+  const StatCard = ({
+    icon, label, value, color,
+  }: { icon: string; label: string; value: string; color: string }) => (
+    <div className="rounded-2xl border bg-ds-surface-container-lowest border-ds-outline-variant px-4 py-4 flex items-center gap-4">
+      <div
+        className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0"
+        style={{ background: color + "1a" }}
+      >
+        <span className="material-symbols-outlined text-[22px]" style={{ color }}>{icon}</span>
       </div>
-      <div>
-        <div style={{ fontSize: 13, color: "var(--ds-on-surface-variant)", fontFamily: "var(--font-body)" }}>{label}</div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)" }}>{value}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] text-ds-outline font-semibold uppercase tracking-wider">{label}</p>
+        <p className="text-xl font-extrabold text-ds-on-surface mt-0.5 truncate" style={headlineFont}>
+          {value}
+        </p>
       </div>
     </div>
   );
 
-  /* ── subscription card ───────────────────────────────────────── */
+  /* ── Subscription card ──────────────────────────────────────── */
   const SubCard = ({ s }: { s: PopulatedSubscription }) => {
     const isPending = s.status === "pending";
     const statusColor = STATUS_COLORS[s.status] || "#70787d";
+    const statusBg = STATUS_BG[s.status] || "rgba(112,120,125,0.10)";
+    const refParts = s.paymentReference && s.paymentReference.includes(" - ")
+      ? s.paymentReference.split(" - ")
+      : null;
+
     return (
-      <div style={{
-        background: "var(--ds-surface-container-lowest)",
-        border: "1px solid var(--ds-outline-variant)",
-        borderRadius: 16, padding: 16, marginBottom: 12,
-        borderLeft: `4px solid ${statusColor}`,
-      }}>
-        {/* user */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: "50%",
-            background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontWeight: 700, fontSize: 14, fontFamily: "var(--font-headline)",
-          }}>
+      <div
+        className="rounded-2xl border bg-ds-surface-container-lowest border-ds-outline-variant overflow-hidden"
+        style={{ borderLeft: `4px solid ${statusColor}` }}
+      >
+        {/* Header: user + status pill */}
+        <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+          <div
+            className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-extrabold text-white flex-shrink-0"
+            style={{ background: "var(--ds-primary-container)", ...headlineFont }}
+          >
             {s.userId?.name?.charAt(0)?.toUpperCase() || "?"}
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 14, color: "var(--ds-on-surface)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-ds-on-surface truncate" style={headlineFont}>
               {s.userId?.name || "Unknown User"}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--ds-on-surface-variant)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            </p>
+            <p className="text-xs text-ds-outline truncate mt-0.5">
               {s.userId?.phone || s.userId?.email || "—"}
-            </div>
+            </p>
             {s.shopName && (
-              <div style={{ fontSize: 11, color: "var(--ds-primary)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 }}>
-                <Icon name="storefront" style={{ fontSize: 13, verticalAlign: "middle", marginRight: 2 }} />
-                Shop: {s.shopName}
-              </div>
+              <p className="text-[11px] text-ds-primary font-bold truncate mt-1 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">storefront</span>
+                {s.shopName}
+              </p>
             )}
           </div>
-          <span style={{
-            fontSize: 11, fontWeight: 600, padding: "3px 10px",
-            borderRadius: 20, background: statusColor + "1a", color: statusColor,
-            textTransform: "capitalize",
-          }}>{s.status}</span>
+          <span
+            className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full capitalize"
+            style={{ background: statusBg, color: statusColor }}
+          >
+            {s.status}
+          </span>
         </div>
 
-        {/* plan + payment */}
-        <div style={{
-          display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
-          fontSize: 12, color: "var(--ds-on-surface-variant)", marginBottom: isPending ? 12 : 0,
-        }}>
-          <div><span style={{ opacity: .6 }}>Plan:</span> <b style={{ color: "var(--ds-on-surface)" }}>{s.planId?.name || "—"}</b></div>
-          <div><span style={{ opacity: .6 }}>Amount:</span> <b style={{ color: "var(--ds-on-surface)" }}>৳{fmt(s.paymentAmount)}</b></div>
-          <div><span style={{ opacity: .6 }}>Method:</span> {s.paymentMethod}</div>
-          <div style={{ gridColumn: "1/-1" }}>
-            <span style={{ opacity: .6 }}>Ref:</span>
-            {s.paymentReference && s.paymentReference.includes(" - ") ? (
-              <span style={{ color: "var(--ds-on-surface)", marginLeft: 4 }}>
-                No: <b style={{ background: "var(--ds-surface-container-high)", padding: "2px 6px", borderRadius: 4 }}>{s.paymentReference.split(" - ")[0]}</b>
-                <span style={{ margin: "0 6px", opacity: 0.5 }}>|</span>
-                TrxID: <b style={{ background: "var(--ds-surface-container-high)", padding: "2px 6px", borderRadius: 4 }}>{s.paymentReference.split(" - ")[1]}</b>
-              </span>
+        {/* Body: plan / payment / ref / submitted */}
+        <div className="px-4 pb-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px] text-ds-on-surface-variant">
+          <div>
+            <span className="text-ds-outline">Plan: </span>
+            <span className="text-ds-on-surface font-bold">{s.planId?.name || "—"}</span>
+          </div>
+          <div>
+            <span className="text-ds-outline">Amount: </span>
+            <span className="text-ds-on-surface font-bold">৳{fmt(s.paymentAmount)}</span>
+          </div>
+          <div className="col-span-2">
+            <span className="text-ds-outline">Method: </span>
+            <span className="text-ds-on-surface font-medium">{s.paymentMethod}</span>
+          </div>
+          <div className="col-span-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-ds-outline">Ref:</span>
+            {refParts ? (
+              <>
+                <span className="text-ds-outline">No:</span>
+                <code className="px-1.5 py-0.5 rounded bg-ds-surface-container-high text-ds-on-surface font-mono text-[11px]">
+                  {refParts[0]}
+                </code>
+                <span className="text-ds-outline-variant">|</span>
+                <span className="text-ds-outline">TrxID:</span>
+                <code className="px-1.5 py-0.5 rounded bg-ds-surface-container-high text-ds-on-surface font-mono text-[11px]">
+                  {refParts[1]}
+                </code>
+              </>
             ) : (
-              <span style={{ marginLeft: 4 }}>{s.paymentReference || "—"}</span>
+              <span className="text-ds-on-surface font-medium">{s.paymentReference || "—"}</span>
             )}
           </div>
-          <div style={{ gridColumn: "1/-1", marginTop: 4 }}><span style={{ opacity: .6 }}>Submitted:</span> {ago(s.createdAt)}</div>
+          <div className="col-span-2 text-[11px] text-ds-outline">
+            Submitted {ago(s.createdAt)}
+          </div>
         </div>
 
-        {/* actions */}
+        {/* Actions */}
         {isPending && (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => handle(s._id, "approve")} disabled={acting === s._id}
-              style={{
-                flex: 1, padding: "10px 0", borderRadius: 12, border: "none",
-                background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
-                fontWeight: 600, fontSize: 13, cursor: "pointer",
-                opacity: acting === s._id ? .5 : 1,
-                fontFamily: "var(--font-body)",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              }}>
-              <Icon name="check_circle" style={{ fontSize: 18 }} /> Approve
+          <div className="px-4 pb-4 flex gap-2.5">
+            <button
+              onClick={() => handle(s._id, "approve")}
+              disabled={acting === s._id}
+              className="flex-1 py-2.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-50"
+              style={{ background: "var(--ds-primary)" }}
+            >
+              <span className="material-symbols-outlined text-[18px]">check_circle</span>
+              Approve
             </button>
-            <button onClick={() => handle(s._id, "reject")} disabled={acting === s._id}
-              style={{
-                flex: 1, padding: "10px 0", borderRadius: 12,
-                border: "1px solid var(--ds-error)", background: "transparent",
-                color: "var(--ds-error)", fontWeight: 600, fontSize: 13, cursor: "pointer",
-                opacity: acting === s._id ? .5 : 1,
-                fontFamily: "var(--font-body)",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              }}>
-              <Icon name="cancel" style={{ fontSize: 18 }} /> Reject
+            <button
+              onClick={() => handle(s._id, "reject")}
+              disabled={acting === s._id}
+              className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-50 border"
+              style={{ color: "var(--ds-error)", borderColor: "var(--ds-error)", background: "rgba(186,26,26,0.04)" }}
+            >
+              <span className="material-symbols-outlined text-[18px]">cancel</span>
+              Reject
             </button>
           </div>
         )}
@@ -203,85 +222,101 @@ export function AdminDashboard() {
     );
   };
 
-  /* ── tab content renderers ───────────────────────────────────── */
+  /* ── Section header ─────────────────────────────────────────── */
+  const PageHeader = ({ title, subtitle }: { title: string; subtitle?: string }) => (
+    <div className="mb-4">
+      <h1 className="text-xl font-extrabold text-ds-on-surface" style={headlineFont}>{title}</h1>
+      {subtitle && <p className="text-xs text-ds-outline mt-1">{subtitle}</p>}
+    </div>
+  );
+
+  const EmptyState = ({ icon, label }: { icon: string; label: string }) => (
+    <div className="rounded-2xl border bg-ds-surface-container-lowest border-ds-outline-variant py-10 px-4 text-center text-ds-outline">
+      <span className="material-symbols-outlined text-[40px] block mb-2 opacity-40">{icon}</span>
+      <p className="text-sm font-medium">{label}</p>
+    </div>
+  );
+
+  const LoadingState = ({ label = "Loading…" }: { label?: string }) => (
+    <div className="py-10 text-center text-ds-outline">
+      <span className="h-7 w-7 border-2 border-ds-outline-variant border-t-ds-primary-container rounded-full animate-spin inline-block mb-2" />
+      <p className="text-sm font-medium">{label}</p>
+    </div>
+  );
+
+  /* ── Tabs ───────────────────────────────────────────────────── */
   const OverviewTab = () => (
-    <div style={{ padding: "20px 16px 100px" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)", margin: 0 }}>
-        Admin Dashboard
-      </h1>
-      <p style={{ fontSize: 13, color: "var(--ds-on-surface-variant)", margin: "4px 0 20px", fontFamily: "var(--font-body)" }}>
-        Subscription overview & quick actions
-      </p>
-      <div style={{ display: "grid", gap: 12 }}>
+    <div className="px-4 pt-5 pb-24 space-y-4">
+      <PageHeader title="Admin Dashboard" subtitle="Subscription overview & quick actions" />
+
+      <div className="grid gap-3">
         <StatCard icon="pending_actions" label="Pending Requests" value={stats ? String(stats.pending) : "—"} color="#e8a735" />
         <StatCard icon="verified" label="Active Subscribers" value={stats ? String(stats.active) : "—"} color="#2ecc71" />
-        <StatCard icon="payments" label="Total Revenue" value={stats ? `৳${fmt(stats.revenue)}` : "—"} color="var(--ds-primary)" />
+        <StatCard icon="payments" label="Total Revenue" value={stats ? `৳${fmt(stats.revenue)}` : "—"} color="#005C72" />
       </div>
 
-      {/* pending preview */}
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--ds-on-surface)", margin: "28px 0 12px", fontFamily: "var(--font-headline)" }}>
-        <Icon name="notifications_active" style={{ fontSize: 18, verticalAlign: "text-bottom", color: "#e8a735", marginRight: 6 }} />
-        Pending Approvals
-      </h2>
-      {loading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "var(--ds-on-surface-variant)" }}>Loading…</div>
-      ) : subs.length === 0 ? (
-        <div style={{
-          textAlign: "center", padding: "36px 16px", color: "var(--ds-on-surface-variant)",
-          background: "var(--ds-surface-container-lowest)", borderRadius: 16,
-          border: "1px solid var(--ds-outline-variant)",
-        }}>
-          <Icon name="task_alt" style={{ fontSize: 40, display: "block", margin: "0 auto 8px", opacity: .4 }} />
-          No pending requests
-        </div>
-      ) : subs.slice(0, 5).map(s => <SubCard key={s._id} s={s} />)}
+      <div className="pt-3">
+        <h2 className="text-sm font-bold text-ds-on-surface mb-3 flex items-center gap-1.5" style={headlineFont}>
+          <span className="material-symbols-outlined text-[18px]" style={{ color: "#e8a735" }}>notifications_active</span>
+          Pending Approvals
+        </h2>
+        {loading ? (
+          <LoadingState />
+        ) : subs.length === 0 ? (
+          <EmptyState icon="task_alt" label="No pending requests" />
+        ) : (
+          <div className="space-y-3">
+            {subs.slice(0, 5).map(s => <SubCard key={s._id} s={s} />)}
+          </div>
+        )}
+      </div>
     </div>
   );
 
   const ListTab = ({ statusFilter }: { statusFilter?: string }) => (
-    <div style={{ padding: "20px 16px 100px" }}>
-      <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)", margin: "0 0 4px" }}>
-        {statusFilter === "pending" ? "Pending Requests" : "All Subscriptions"}
-      </h1>
-      <p style={{ fontSize: 13, color: "var(--ds-on-surface-variant)", margin: "0 0 16px", fontFamily: "var(--font-body)" }}>
-        {total} record{total !== 1 ? "s" : ""} found
-      </p>
+    <div className="px-4 pt-5 pb-24">
+      <PageHeader
+        title={statusFilter === "pending" ? "Pending Requests" : "All Subscriptions"}
+        subtitle={`${total} record${total !== 1 ? "s" : ""} found`}
+      />
 
-      {/* filter pills for "all" tab */}
       {!statusFilter && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto", paddingBottom: 4 }}>
-          {["all", "pending", "active", "expired", "cancelled"].map(f => (
-            <button key={f} onClick={() => { setFilter(f === "all" ? undefined : f); fetchSubs(f === "all" ? undefined : f); }}
-              style={{
-                padding: "6px 16px", borderRadius: 20, border: "1px solid var(--ds-outline-variant)",
-                background: (f === "all" ? !filter : filter === f) ? "var(--ds-primary-container)" : "transparent",
-                color: (f === "all" ? !filter : filter === f) ? "var(--ds-on-primary)" : "var(--ds-on-surface-variant)",
-                fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
-                fontFamily: "var(--font-body)", textTransform: "capitalize",
-              }}>{f}</button>
-          ))}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+          {["all", "pending", "active", "expired", "cancelled"].map(f => {
+            const active = f === "all" ? !filter : filter === f;
+            return (
+              <button
+                key={f}
+                onClick={() => { setFilter(f === "all" ? undefined : f); fetchSubs(f === "all" ? undefined : f); }}
+                className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-bold border capitalize transition-colors ${
+                  active
+                    ? "text-white border-transparent"
+                    : "text-ds-on-surface-variant bg-ds-surface-container-lowest border-ds-outline-variant"
+                }`}
+                style={active ? { background: "var(--ds-primary)" } : undefined}
+              >
+                {f}
+              </button>
+            );
+          })}
         </div>
       )}
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: 40, color: "var(--ds-on-surface-variant)" }}>Loading…</div>
+        <LoadingState />
       ) : subs.length === 0 ? (
-        <div style={{
-          textAlign: "center", padding: "36px 16px", color: "var(--ds-on-surface-variant)",
-          background: "var(--ds-surface-container-lowest)", borderRadius: 16,
-          border: "1px solid var(--ds-outline-variant)",
-        }}>
-          <Icon name="inbox" style={{ fontSize: 40, display: "block", margin: "0 auto 8px", opacity: .4 }} />
-          No subscriptions found
+        <EmptyState icon="inbox" label="No subscriptions found" />
+      ) : (
+        <div className="space-y-3">
+          {subs.map(s => <SubCard key={s._id} s={s} />)}
         </div>
-      ) : subs.map(s => <SubCard key={s._id} s={s} />)}
+      )}
     </div>
   );
 
   const PlansTab = () => {
     const [subTab, setSubTab] = useState<"plans" | "cycles">("plans");
 
-    // --- Plans State ---
     const [plans, setPlans] = useState<ApiPlan[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
@@ -292,7 +327,6 @@ export function AdminDashboard() {
       features: { receiptCustomization: false, exportPdf: false, analytics: false }
     });
 
-    // --- Cycles State ---
     const [cycles, setCycles] = useState<ApiBillingCycle[]>([]);
     const [loadingCycles, setLoadingCycles] = useState(false);
     const [showAddCycle, setShowAddCycle] = useState(false);
@@ -326,30 +360,24 @@ export function AdminDashboard() {
     const handleCreate = async (e: React.FormEvent) => {
       e.preventDefault();
       try {
-        // Auto-generate slug from name
         const slug = formData.name?.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
         const payload = { ...formData, slug };
-
         const r = await adminApi.createPlan(payload);
-        setToast(r.message);
-        setTimeout(() => setToast(""), 2600);
+        showToast(r.message);
         setShowAdd(false);
         loadPlans();
       } catch (err: any) {
-        setToast(err.message);
-        setTimeout(() => setToast(""), 2600);
+        showToast(err.message, "error");
       }
     };
 
     const togglePlanStatus = async (id: string, isActive: boolean) => {
       try {
         const r = await adminApi.togglePlanStatus(id, isActive);
-        setToast(r.message);
-        setTimeout(() => setToast(""), 2600);
+        showToast(r.message);
         loadPlans();
       } catch (err: any) {
-        setToast(err.message);
-        setTimeout(() => setToast(""), 2600);
+        showToast(err.message, "error");
       }
     };
 
@@ -357,114 +385,107 @@ export function AdminDashboard() {
       e.preventDefault();
       try {
         const r = await billingCycleApi.create(cycleData);
-        setToast(r.message);
-        setTimeout(() => setToast(""), 2600);
+        showToast(r.message);
         setShowAddCycle(false);
         loadCycles();
       } catch (err: any) {
-        setToast(err.message);
-        setTimeout(() => setToast(""), 2600);
+        showToast(err.message, "error");
       }
     };
 
     const toggleCycleStatus = async (id: string, isActive: boolean) => {
       try {
         const r = await billingCycleApi.toggleStatus(id, isActive);
-        setToast(r.message);
-        setTimeout(() => setToast(""), 2600);
+        showToast(r.message);
         loadCycles();
       } catch (err: any) {
-        setToast(err.message);
-        setTimeout(() => setToast(""), 2600);
+        showToast(err.message, "error");
       }
     };
 
-    return (
-      <div style={{ padding: "20px 16px 100px" }}>
-        <div style={{ display: "flex", gap: 12, marginBottom: 20, borderBottom: "1px solid var(--ds-outline-variant)" }}>
-          <button onClick={() => setSubTab("plans")} style={{
-            background: "none", border: "none", padding: "8px 0", cursor: "pointer",
-            fontWeight: subTab === "plans" ? 800 : 600, fontSize: 16,
-            color: subTab === "plans" ? "var(--ds-primary)" : "var(--ds-on-surface-variant)",
-            borderBottom: subTab === "plans" ? "3px solid var(--ds-primary)" : "3px solid transparent",
-            fontFamily: "var(--font-headline)"
-          }}>Pricing Plans</button>
+    const inputClass = "w-full rounded-lg border border-ds-outline-variant bg-ds-surface-container-low px-3 py-2 text-sm text-ds-on-surface focus:outline-none focus:border-ds-primary-container transition-colors";
+    const labelClass = "text-[10px] font-bold uppercase tracking-wider text-ds-outline";
 
-          <button onClick={() => setSubTab("cycles")} style={{
-            background: "none", border: "none", padding: "8px 0", cursor: "pointer",
-            fontWeight: subTab === "cycles" ? 800 : 600, fontSize: 16,
-            color: subTab === "cycles" ? "var(--ds-primary)" : "var(--ds-on-surface-variant)",
-            borderBottom: subTab === "cycles" ? "3px solid var(--ds-primary)" : "3px solid transparent",
-            fontFamily: "var(--font-headline)"
-          }}>Billing Cycles</button>
+    return (
+      <div className="px-4 pt-5 pb-24">
+        {/* Sub-tab switcher */}
+        <div className="flex gap-2 mb-5 border-b border-ds-outline-variant">
+          {([
+            { key: "plans", label: "Pricing Plans" },
+            { key: "cycles", label: "Billing Cycles" },
+          ] as const).map(t => {
+            const active = subTab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setSubTab(t.key)}
+                className={`pb-2.5 px-1 text-sm transition-colors border-b-[3px] -mb-px ${
+                  active ? "text-ds-primary font-extrabold border-ds-primary" : "text-ds-outline font-bold border-transparent"
+                }`}
+                style={headlineFont}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
         {subTab === "plans" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)", margin: 0 }}>
-                Subscription Plans
-              </h1>
-              <button onClick={() => setShowAdd(!showAdd)} style={{
-                background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
-                border: "none", padding: "6px 12px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-                display: "flex", alignItems: "center", gap: 4, cursor: "pointer"
-              }}>
-                <Icon name={showAdd ? "close" : "add"} style={{ fontSize: 18 }} /> {showAdd ? "Cancel" : "Add Plan"}
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-lg font-extrabold text-ds-on-surface" style={headlineFont}>Subscription Plans</h1>
+              <button
+                onClick={() => setShowAdd(!showAdd)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-white text-xs font-bold transition-all active:scale-95"
+                style={{ background: "var(--ds-primary)" }}
+              >
+                <span className="material-symbols-outlined text-[16px]">{showAdd ? "close" : "add"}</span>
+                {showAdd ? "Cancel" : "Add Plan"}
               </button>
             </div>
 
             {showAdd && (
-              <div style={{
-                background: "var(--ds-surface-container-lowest)", border: "1px solid var(--ds-outline-variant)",
-                borderRadius: 16, padding: 16, marginBottom: 20
-              }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>Create New Plan</h2>
-
-                <form onSubmit={handleCreate} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Name</label>
-                      <input required autoComplete="off" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+              <div className="rounded-2xl border bg-ds-surface-container-lowest border-ds-outline-variant p-4 mb-5">
+                <h2 className="text-sm font-extrabold text-ds-on-surface mb-3" style={headlineFont}>Create New Plan</h2>
+                <form onSubmit={handleCreate} autoComplete="off" className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className={labelClass}>Name</label>
+                      <input required autoComplete="off" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className={inputClass} />
                     </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Price</label>
-                      <input required autoComplete="off" type="number" value={formData.price ?? ""} onChange={e => setFormData({ ...formData, price: e.target.value === "" ? undefined : Number(e.target.value) })}
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                    <div className="space-y-1">
+                      <label className={labelClass}>Price (Base)</label>
+                      <input required autoComplete="off" type="number" value={formData.price ?? ""} onChange={e => setFormData({ ...formData, price: e.target.value === "" ? undefined : Number(e.target.value) })} className={inputClass} />
                     </div>
                   </div>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Description</label>
-                    <input required autoComplete="off" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
-                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                  <div className="space-y-1">
+                    <label className={labelClass}>Description</label>
+                    <input required autoComplete="off" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className={inputClass} />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Shops</label>
-                      <input required autoComplete="off" type="number" value={formData.maxShops ?? ""} onChange={e => setFormData({ ...formData, maxShops: e.target.value === "" ? undefined : Number(e.target.value) })}
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className={labelClass}>Max Shops</label>
+                      <input required autoComplete="off" type="number" value={formData.maxShops ?? ""} onChange={e => setFormData({ ...formData, maxShops: e.target.value === "" ? undefined : Number(e.target.value) })} className={inputClass} />
                     </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Products/Shop</label>
-                      <input required autoComplete="off" type="number" value={formData.maxProductsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxProductsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })}
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                    <div className="space-y-1">
+                      <label className={labelClass}>Max Products/Shop</label>
+                      <input required autoComplete="off" type="number" value={formData.maxProductsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxProductsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })} className={inputClass} />
                     </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Moderators/Shop</label>
-                      <input required autoComplete="off" type="number" value={formData.maxModeratorsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxModeratorsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })}
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                    <div className="space-y-1">
+                      <label className={labelClass}>Max Moderators/Shop</label>
+                      <input required autoComplete="off" type="number" value={formData.maxModeratorsPerShop ?? ""} onChange={e => setFormData({ ...formData, maxModeratorsPerShop: e.target.value === "" ? undefined : Number(e.target.value) })} className={inputClass} />
                     </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Max Invoices/Month</label>
-                      <input required autoComplete="off" type="number" value={formData.maxInvoicesPerMonth ?? ""} onChange={e => setFormData({ ...formData, maxInvoicesPerMonth: e.target.value === "" ? undefined : Number(e.target.value) })}
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+                    <div className="space-y-1">
+                      <label className={labelClass}>Max Invoices/Month</label>
+                      <input required autoComplete="off" type="number" value={formData.maxInvoicesPerMonth ?? ""} onChange={e => setFormData({ ...formData, maxInvoicesPerMonth: e.target.value === "" ? undefined : Number(e.target.value) })} className={inputClass} />
                     </div>
                   </div>
-                  <button type="submit" style={{
-                    background: "var(--ds-primary)", color: "white", padding: "10px", borderRadius: 8,
-                    border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 8
-                  }}>
+                  <button
+                    type="submit"
+                    className="w-full py-3 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                    style={{ background: "var(--ds-primary)" }}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">save</span>
                     Save Plan
                   </button>
                 </form>
@@ -472,54 +493,64 @@ export function AdminDashboard() {
             )}
 
             {loadingPlans ? (
-              <div style={{ textAlign: "center", padding: 40, color: "var(--ds-on-surface-variant)" }}>Loading plans…</div>
+              <LoadingState label="Loading plans…" />
             ) : (
-              <div style={{ display: "grid", gap: 12 }}>
+              <div className="space-y-3">
                 {plans.map(p => (
-                  <div key={p._id} style={{
-                    background: "var(--ds-surface-container-lowest)", border: "1px solid var(--ds-outline-variant)",
-                    borderRadius: 16, padding: 16
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--ds-primary)" }}>{p.name}</h3>
-                          <span style={{
-                            padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                            background: p.isActive ? "#e8f5e9" : "#ffebee", color: p.isActive ? "#2e7d32" : "#c62828"
-                          }}>
+                  <div key={p._id} className="rounded-2xl border bg-ds-surface-container-lowest border-ds-outline-variant p-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base font-extrabold text-ds-primary" style={headlineFont}>{p.name}</h3>
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                            style={{
+                              background: p.isActive ? "rgba(46,125,50,0.10)" : "rgba(198,40,40,0.10)",
+                              color: p.isActive ? "#2e7d32" : "#c62828",
+                            }}
+                          >
                             {p.isActive ? "Active" : "Inactive"}
                           </span>
                         </div>
-                        <span style={{ fontSize: 11, color: "var(--ds-on-surface-variant)", background: "var(--ds-surface-container-high)", padding: "2px 8px", borderRadius: 10 }}>{p.slug}</span>
+                        <span className="inline-block text-[10px] text-ds-outline bg-ds-surface-container-high px-2 py-0.5 rounded-full font-mono mt-1.5">
+                          {p.slug}
+                        </span>
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 16, fontWeight: 800 }}>৳{fmt(p.price)} /mo Base</div>
+                      <div className="text-right">
+                        <p className="text-base font-extrabold text-ds-on-surface" style={headlineFont}>৳{fmt(p.price)}</p>
+                        <p className="text-[10px] text-ds-outline uppercase tracking-wider">Base /mo</p>
                       </div>
                     </div>
-                    <p style={{ fontSize: 12, margin: "0 0 12px", color: "var(--ds-on-surface-variant)" }}>{p.description}</p>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                      <div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11 }}>
-                          <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Shops: {p.maxShops === -1 ? "∞" : p.maxShops}</span>
-                          <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Products: {p.maxProductsPerShop === -1 ? "∞" : p.maxProductsPerShop}</span>
-                          <span style={{ background: "#e6e8e9", padding: "4px 8px", borderRadius: 6 }}>Invoices: {p.maxInvoicesPerMonth === -1 ? "∞" : p.maxInvoicesPerMonth}</span>
-                        </div>
-                        {!p.isActive && p.deactivatedAt && (
-                          <div style={{ fontSize: 10, color: "var(--ds-on-surface-variant)", marginTop: 6 }}>
-                            Deactivated on: {new Date(p.deactivatedAt).toLocaleDateString()} {new Date(p.deactivatedAt).toLocaleTimeString()}
-                          </div>
-                        )}
+                    <p className="text-xs text-ds-on-surface-variant mb-3">{p.description}</p>
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="text-[11px] font-semibold bg-ds-surface-container-high text-ds-on-surface px-2 py-1 rounded-md">
+                          Shops: {p.maxShops === -1 ? "∞" : p.maxShops}
+                        </span>
+                        <span className="text-[11px] font-semibold bg-ds-surface-container-high text-ds-on-surface px-2 py-1 rounded-md">
+                          Products: {p.maxProductsPerShop === -1 ? "∞" : p.maxProductsPerShop}
+                        </span>
+                        <span className="text-[11px] font-semibold bg-ds-surface-container-high text-ds-on-surface px-2 py-1 rounded-md">
+                          Invoices: {p.maxInvoicesPerMonth === -1 ? "∞" : p.maxInvoicesPerMonth}
+                        </span>
                       </div>
-                      <button onClick={() => togglePlanStatus(p._id, !p.isActive)} style={{
-                        background: p.isActive ? "transparent" : "var(--ds-primary-container)",
-                        color: p.isActive ? "var(--ds-on-surface-variant)" : "var(--ds-on-primary)",
-                        padding: "6px 12px", borderRadius: 10, border: p.isActive ? "1px solid var(--ds-outline-variant)" : "none",
-                        cursor: "pointer", fontSize: 12, fontWeight: 600
-                      }}>
+                      <button
+                        onClick={() => togglePlanStatus(p._id, !p.isActive)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${
+                          p.isActive
+                            ? "border border-ds-outline-variant text-ds-on-surface-variant bg-ds-surface-container-lowest"
+                            : "text-white"
+                        }`}
+                        style={!p.isActive ? { background: "var(--ds-primary)" } : undefined}
+                      >
                         {p.isActive ? "Deactivate" : "Activate"}
                       </button>
                     </div>
+                    {!p.isActive && p.deactivatedAt && (
+                      <p className="text-[10px] text-ds-outline mt-2">
+                        Deactivated on {new Date(p.deactivatedAt).toLocaleDateString()} {new Date(p.deactivatedAt).toLocaleTimeString()}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -529,49 +560,42 @@ export function AdminDashboard() {
 
         {subTab === "cycles" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)", margin: 0 }}>
-                Billing Cycles
-              </h1>
-              <button onClick={() => setShowAddCycle(!showAddCycle)} style={{
-                background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
-                border: "none", padding: "6px 12px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-                display: "flex", alignItems: "center", gap: 4, cursor: "pointer"
-              }}>
-                <Icon name={showAddCycle ? "close" : "add"} style={{ fontSize: 18 }} /> {showAddCycle ? "Cancel" : "Add Cycle"}
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-lg font-extrabold text-ds-on-surface" style={headlineFont}>Billing Cycles</h1>
+              <button
+                onClick={() => setShowAddCycle(!showAddCycle)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-white text-xs font-bold transition-all active:scale-95"
+                style={{ background: "var(--ds-primary)" }}
+              >
+                <span className="material-symbols-outlined text-[16px]">{showAddCycle ? "close" : "add"}</span>
+                {showAddCycle ? "Cancel" : "Add Cycle"}
               </button>
             </div>
 
             {showAddCycle && (
-              <div style={{
-                background: "var(--ds-surface-container-lowest)", border: "1px solid var(--ds-outline-variant)",
-                borderRadius: 16, padding: 16, marginBottom: 20
-              }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>Create New Cycle</h2>
-                <form onSubmit={handleCreateCycle} autoComplete="off" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Cycle Name (e.g., Monthly)</label>
-                      <input required autoComplete="off" value={cycleData.name} onChange={e => setCycleData({ ...cycleData, name: e.target.value })}
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
+              <div className="rounded-2xl border bg-ds-surface-container-lowest border-ds-outline-variant p-4 mb-5">
+                <h2 className="text-sm font-extrabold text-ds-on-surface mb-3" style={headlineFont}>Create New Cycle</h2>
+                <form onSubmit={handleCreateCycle} autoComplete="off" className="space-y-3">
+                  <div className="space-y-1">
+                    <label className={labelClass}>Cycle Name (e.g. Monthly, Yearly)</label>
+                    <input required autoComplete="off" value={cycleData.name} onChange={e => setCycleData({ ...cycleData, name: e.target.value })} className={inputClass} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className={labelClass}>Duration (Months)</label>
+                      <input required autoComplete="off" type="number" min={1} value={cycleData.durationInMonths ?? ""} onChange={e => setCycleData({ ...cycleData, durationInMonths: e.target.value === "" ? undefined : Number(e.target.value) })} className={inputClass} />
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Duration (Months)</label>
-                        <input required autoComplete="off" type="number" min={1} value={cycleData.durationInMonths ?? ""} onChange={e => setCycleData({ ...cycleData, durationInMonths: e.target.value === "" ? undefined : Number(e.target.value) })}
-                          style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ds-on-surface-variant)" }}>Discount (Flat Amount)</label>
-                        <input required autoComplete="off" type="number" min={0} value={cycleData.discountAmount ?? ""} onChange={e => setCycleData({ ...cycleData, discountAmount: e.target.value === "" ? undefined : Number(e.target.value) })}
-                          style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--ds-outline-variant)", marginTop: 4, fontSize: 13 }} />
-                      </div>
+                    <div className="space-y-1">
+                      <label className={labelClass}>Discount Amount</label>
+                      <input required autoComplete="off" type="number" min={0} value={cycleData.discountAmount ?? ""} onChange={e => setCycleData({ ...cycleData, discountAmount: e.target.value === "" ? undefined : Number(e.target.value) })} className={inputClass} />
                     </div>
                   </div>
-                  <button type="submit" style={{
-                    background: "var(--ds-primary)", color: "white", padding: "10px", borderRadius: 8,
-                    border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 8
-                  }}>
+                  <button
+                    type="submit"
+                    className="w-full py-3 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                    style={{ background: "var(--ds-primary)" }}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">save</span>
                     Save Cycle
                   </button>
                 </form>
@@ -579,47 +603,49 @@ export function AdminDashboard() {
             )}
 
             {loadingCycles ? (
-              <div style={{ textAlign: "center", padding: 40, color: "var(--ds-on-surface-variant)" }}>Loading cycles…</div>
+              <LoadingState label="Loading cycles…" />
             ) : cycles.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 40, color: "var(--ds-on-surface-variant)" }}>No billing cycles created.</div>
+              <EmptyState icon="event_repeat" label="No billing cycles yet" />
             ) : (
-              <div style={{ display: "grid", gap: 12 }}>
+              <div className="space-y-3">
                 {cycles.map(c => (
-                  <div key={c._id} style={{
-                    background: "var(--ds-surface-container-lowest)", border: "1px solid var(--ds-outline-variant)",
-                    borderRadius: 16, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center"
-                  }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--ds-on-surface)" }}>
-                        {c.name} <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ds-on-surface-variant)", marginLeft: 6 }}>({c.durationInMonths} Months)</span>
+                  <div key={c._id} className="rounded-2xl border bg-ds-surface-container-lowest border-ds-outline-variant p-4 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-extrabold text-ds-on-surface" style={headlineFont}>
+                        {c.name}
+                        <span className="text-xs text-ds-outline font-semibold ml-2">({c.durationInMonths} months)</span>
                       </h3>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                        <span style={{
-                          padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                          background: c.isActive ? "#e8f5e9" : "#ffebee", color: c.isActive ? "#2e7d32" : "#c62828"
-                        }}>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span
+                          className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                          style={{
+                            background: c.isActive ? "rgba(46,125,50,0.10)" : "rgba(198,40,40,0.10)",
+                            color: c.isActive ? "#2e7d32" : "#c62828",
+                          }}
+                        >
                           {c.isActive ? "Active" : "Inactive"}
                         </span>
-                        <span style={{ fontSize: 13, color: "var(--ds-on-surface-variant)" }}>
-                          Discount: ৳{fmt(c.discountAmount)}
+                        <span className="text-xs text-ds-on-surface-variant">
+                          Discount: <span className="font-bold text-ds-on-surface">৳{fmt(c.discountAmount)}</span>
                         </span>
                       </div>
                       {!c.isActive && c.deactivatedAt && (
-                        <div style={{ fontSize: 10, color: "var(--ds-on-surface-variant)", marginTop: 6 }}>
-                          Deactivated on: {new Date(c.deactivatedAt).toLocaleDateString()} {new Date(c.deactivatedAt).toLocaleTimeString()}
-                        </div>
+                        <p className="text-[10px] text-ds-outline mt-1.5">
+                          Deactivated on {new Date(c.deactivatedAt).toLocaleDateString()}
+                        </p>
                       )}
                     </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => toggleCycleStatus(c._id, !c.isActive)} style={{
-                        background: c.isActive ? "transparent" : "var(--ds-primary-container)",
-                        color: c.isActive ? "var(--ds-on-surface-variant)" : "var(--ds-on-primary)",
-                        padding: "6px 12px", borderRadius: 10, border: c.isActive ? "1px solid var(--ds-outline-variant)" : "none",
-                        cursor: "pointer", fontSize: 12, fontWeight: 600
-                      }}>
-                        {c.isActive ? "Deactivate" : "Activate"}
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => toggleCycleStatus(c._id, !c.isActive)}
+                      className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${
+                        c.isActive
+                          ? "border border-ds-outline-variant text-ds-on-surface-variant bg-ds-surface-container-lowest"
+                          : "text-white"
+                      }`}
+                      style={!c.isActive ? { background: "var(--ds-primary)" } : undefined}
+                    >
+                      {c.isActive ? "Deactivate" : "Activate"}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -634,35 +660,39 @@ export function AdminDashboard() {
     const name = sessionStorage.getItem("userName") || "Admin";
     const email = sessionStorage.getItem("userEmail") || "—";
     const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
     return (
-      <div style={{ padding: "20px 16px 100px" }}>
-        <div style={{
-          background: "var(--ds-surface-container-lowest)", borderRadius: 20,
-          border: "1px solid var(--ds-outline-variant)", padding: "28px 20px",
-          textAlign: "center", marginBottom: 16,
-        }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: "50%", margin: "0 auto 12px",
-            background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 24, fontWeight: 700, fontFamily: "var(--font-headline)",
-          }}>{initials}</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)" }}>{name}</div>
-          <div style={{ fontSize: 13, color: "var(--ds-on-surface-variant)" }}>{email}</div>
-          <span style={{
-            display: "inline-block", marginTop: 8, padding: "4px 14px", borderRadius: 20,
-            background: "var(--ds-primary-container)", color: "var(--ds-on-primary)",
-            fontSize: 12, fontWeight: 600,
-          }}>Administrator</span>
+      <div className="px-4 pt-5 pb-24 space-y-4">
+        <div className="rounded-2xl border bg-ds-surface-container-lowest border-ds-outline-variant p-5 flex items-center gap-4">
+          <div
+            className="h-16 w-16 rounded-2xl flex items-center justify-center text-xl font-extrabold text-white flex-shrink-0"
+            style={{ background: "var(--ds-primary-container)", ...headlineFont }}
+          >
+            {initials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-ds-on-surface font-extrabold text-base truncate" style={headlineFont}>{name}</p>
+            <p className="text-ds-outline text-xs truncate mt-0.5">{email}</p>
+            <span
+              className="inline-block mt-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+              style={{ background: "rgba(0,92,114,0.10)", color: "var(--ds-primary-container)" }}
+            >
+              Administrator
+            </span>
+          </div>
         </div>
 
-        <button onClick={logout} style={{
-          width: "100%", padding: "14px 0", borderRadius: 14, border: "1px solid var(--ds-error)",
-          background: "transparent", color: "var(--ds-error)", fontWeight: 600, fontSize: 14,
-          cursor: "pointer", fontFamily: "var(--font-body)",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        }}>
-          <Icon name="logout" style={{ fontSize: 20 }} /> Sign Out
+        <button
+          onClick={logout}
+          className="w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border transition-all active:scale-[0.98]"
+          style={{
+            color: "var(--ds-error)",
+            borderColor: "var(--ds-error)",
+            background: "rgba(186,26,26,0.04)",
+          }}
+        >
+          <span className="material-symbols-outlined text-xl">logout</span>
+          Sign out
         </button>
       </div>
     );
@@ -679,55 +709,46 @@ export function AdminDashboard() {
 
   /* ── render ──────────────────────────────────────────────────── */
   return (
-    <div style={{
-      minHeight: "100dvh", background: "var(--ds-background)",
-      fontFamily: "var(--font-body)", maxWidth: 480, margin: "0 auto",
-      position: "relative",
-    }}>
-      {/* top bar */}
-      <header style={{
-        position: "sticky", top: 0, zIndex: 30,
-        background: "var(--ds-surface-container-lowest)",
-        borderBottom: "1px solid var(--ds-outline-variant)",
-        padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 10,
-            background: "var(--ds-primary-container)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Icon name="shield_person" style={{ fontSize: 20, color: "var(--ds-on-primary)" }} />
-          </div>
-          <span style={{ fontWeight: 700, fontSize: 16, color: "var(--ds-on-surface)", fontFamily: "var(--font-headline)" }}>
-            Admin
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {stats && stats.pending > 0 && (
-            <span style={{
-              padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
-              background: "#e8a73520", color: "#e8a735",
-            }}>
-              {stats.pending} pending
+    <div
+      className="min-h-screen flex flex-col bg-ds-background text-ds-on-background"
+      style={{ fontFamily: "'Inter', sans-serif" }}
+    >
+      {/* Top bar */}
+      <header className="sticky top-0 z-30 bg-ds-surface-container-lowest/95 backdrop-blur-md border-b border-ds-outline-variant/50">
+        <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto w-full">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="h-9 w-9 rounded-xl flex items-center justify-center"
+              style={{ background: "var(--ds-primary-container)" }}
+            >
+              <span className="material-symbols-outlined text-[20px] text-white">shield_person</span>
+            </div>
+            <span className="text-ds-primary font-extrabold text-base" style={headlineFont}>
+              Admin
             </span>
-          )}
-          <button
-            onClick={logout}
-            style={{
-              background: "transparent", border: "none", padding: 8, borderRadius: "50%",
-              color: "var(--ds-on-surface-variant)", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-            title="Logout"
-          >
-            <Icon name="logout" style={{ fontSize: 20 }} />
-          </button>
+          </div>
+          <div className="flex items-center gap-2">
+            {stats && stats.pending > 0 && (
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(232,167,53,0.12)", color: "#b8860b" }}
+              >
+                {stats.pending} pending
+              </span>
+            )}
+            <button
+              onClick={logout}
+              className="p-2 rounded-full text-ds-outline hover:bg-ds-surface-container-high transition-colors"
+              title="Logout"
+            >
+              <span className="material-symbols-outlined text-xl">logout</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* content */}
-      <main>
+      {/* Page content */}
+      <main className="flex-1 overflow-y-auto max-w-lg mx-auto w-full">
         {tab === "overview" && <OverviewTab />}
         {tab === "pending" && <ListTab statusFilter="pending" />}
         {tab === "all" && <ListTab />}
@@ -735,59 +756,63 @@ export function AdminDashboard() {
         {tab === "profile" && <ProfileTab />}
       </main>
 
-      {/* toast */}
+      {/* Toast */}
       {toast && (
-        <div style={{
-          position: "fixed", bottom: 88, left: "50%", transform: "translateX(-50%)",
-          background: "var(--ds-on-surface)", color: "var(--ds-surface-container-lowest)",
-          padding: "10px 24px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-          zIndex: 50, boxShadow: "0 4px 20px rgba(0,0,0,.15)",
-          animation: "fadeInUp .25s ease",
-        }}>{toast}</div>
+        <div
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-[200] px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium max-w-sm"
+          style={{
+            background: toast.type === "success" ? "var(--ds-secondary-container)" : "var(--ds-error-container)",
+            color: toast.type === "success" ? "var(--ds-on-secondary-container)" : "var(--ds-on-error-container)",
+          }}
+        >
+          <span className="material-symbols-outlined text-base">
+            {toast.type === "success" ? "check_circle" : "error"}
+          </span>
+          {toast.msg}
+        </div>
       )}
 
-      {/* bottom nav */}
-      <nav style={{
-        position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-        width: "100%", maxWidth: 480,
-        background: "var(--ds-surface-container-lowest)",
-        borderTop: "1px solid var(--ds-outline-variant)",
-        display: "flex", justifyContent: "space-around",
-        padding: "6px 0 env(safe-area-inset-bottom, 8px)",
-        zIndex: 40,
-      }}>
-        {navItems.map(n => {
-          const active = tab === n.key;
-          return (
-            <button key={n.key} onClick={() => setTab(n.key)}
-              style={{
-                flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-                gap: 2, padding: "6px 0", border: "none", background: "transparent",
-                cursor: "pointer", transition: "color .15s",
-                color: active ? "var(--ds-primary)" : "var(--ds-on-surface-variant)",
-              }}>
-              <Icon name={n.icon} style={{
-                fontSize: 24,
-                fontVariationSettings: active ? "'FILL' 1, 'wght' 600" : "'FILL' 0, 'wght' 400",
-              }} />
-              <span style={{ fontSize: 11, fontWeight: active ? 700 : 500 }}>{n.label}</span>
-              {n.key === "pending" && stats && stats.pending > 0 && (
-                <span style={{
-                  position: "absolute", top: 2, marginLeft: 20,
-                  width: 8, height: 8, borderRadius: "50%", background: "#e8a735",
-                }} />
-              )}
-            </button>
-          );
-        })}
+      {/* Bottom nav */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-ds-outline-variant/60 bg-ds-surface-container-lowest/95 backdrop-blur-md"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
+        <div className="max-w-lg mx-auto flex items-stretch h-16">
+          {navItems.map(n => {
+            const active = tab === n.key;
+            const showDot = n.key === "pending" && stats && stats.pending > 0;
+            return (
+              <button
+                key={n.key}
+                onClick={() => setTab(n.key)}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 relative"
+              >
+                <span
+                  className="material-symbols-outlined text-[22px] transition-all"
+                  style={{
+                    fontVariationSettings: active ? "'FILL' 1" : "'FILL' 0",
+                    color: active ? "var(--ds-primary-container)" : "var(--ds-outline)",
+                  }}
+                >
+                  {n.icon}
+                </span>
+                <span
+                  className="text-[10px] font-semibold tracking-wide transition-colors"
+                  style={{ color: active ? "var(--ds-primary-container)" : "var(--ds-outline)" }}
+                >
+                  {n.label}
+                </span>
+                {showDot && (
+                  <span
+                    className="absolute top-2 right-[calc(50%-16px)] h-2 w-2 rounded-full"
+                    style={{ background: "#e8a735" }}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </nav>
-
-      <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateX(-50%) translateY(12px); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }
