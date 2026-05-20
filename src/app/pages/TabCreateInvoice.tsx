@@ -51,7 +51,7 @@ export function TabCreateInvoice({
   useEffect(() => {
     if (shop) {
       setLoadingProducts(true);
-      productApi.getAll(false, shop._id).then(res => {
+      productApi.getAll(false, shop._id, 1, 500).then(res => {
         setProducts(res.products || []);
         setLoadingProducts(false);
       }).catch(() => {
