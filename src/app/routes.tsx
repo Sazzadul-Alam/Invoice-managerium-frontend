@@ -47,7 +47,15 @@ export const router = createBrowserRouter([
     Component: Dashboard,
   },
   {
-    path: "/admin/dashboard",
+    path: "/admin",
+    Component: AdminDashboard,
+  },
+  {
+    path: "/admin/:tab",
+    Component: AdminDashboard,
+  },
+  {
+    path: "/admin/:tab/:subTab",
     Component: AdminDashboard,
   },
 ]);

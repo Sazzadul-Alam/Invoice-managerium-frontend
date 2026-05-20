@@ -20,13 +20,6 @@ const BASE_TABS = [
   { key: "profile", icon: "manage_accounts", label: "Profile" },
 ];
 
-const ACTIVE_SUBSCRIPTION_TABS = [
-  { key: "create_invoice", icon: "add_shopping_cart", label: "Create Invoice" },
-  { key: "products", icon: "inventory_2", label: "Products" },
-  { key: "history", icon: "history", label: "Invoice History" },
-  { key: "profile", icon: "manage_accounts", label: "Profile" },
-];
-
 type TabKey = string;
 
 /* ────────────────────────────────────────────────────────────────────────── */
@@ -315,7 +308,7 @@ export function Dashboard() {
         }}
       >
         <div className="max-w-lg mx-auto flex items-stretch h-16">
-          {(activeSub ? ACTIVE_SUBSCRIPTION_TABS : BASE_TABS).map((tabItem) => {
+          {BASE_TABS.map((tabItem) => {
             const active = tabItem.key === activeTab;
             return (
               <button
@@ -469,25 +462,34 @@ function TabBuyPlan({
       {plans.length === 0 && (
         <p className="text-sm text-ds-outline text-center py-8">No plans available.</p>
       )}
-      {/* 
+
+      {/* Billing cycle selector */}
       {plans.length > 0 && cycles.length > 0 && (
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-          {cycles.map(cycle => (
-            <button
-              key={cycle._id}
-              onClick={() => setSelectedCycleId(cycle._id)}
-              className="px-4 py-2 rounded-full border text-sm font-bold whitespace-nowrap transition-all"
-              style={{
-                background: selectedCycleId === cycle._id ? "var(--ds-primary-container)" : "transparent",
-                color: selectedCycleId === cycle._id ? "var(--ds-on-primary)" : "var(--ds-on-surface-variant)",
-                borderColor: selectedCycleId === cycle._id ? "var(--ds-primary)" : "var(--ds-outline-variant)",
-              }}
-            >
-              {cycle.name} {cycle.discountAmount > 0 ? `(Save ৳${cycle.discountAmount})` : ""}
-            </button>
-          ))}
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-ds-outline mb-2">
+            Billing Cycle
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {cycles.map((cycle) => {
+              const active = selectedCycleId === cycle._id;
+              return (
+                <button
+                  key={cycle._id}
+                  onClick={() => setSelectedCycleId(cycle._id)}
+                  className={`px-4 py-2 rounded-full border text-xs font-bold transition-all active:scale-95 ${
+                    active
+                      ? "text-white border-transparent"
+                      : "text-ds-on-surface-variant bg-ds-surface-container-lowest border-ds-outline-variant"
+                  }`}
+                  style={active ? { background: "var(--ds-primary)" } : undefined}
+                >
+                  {cycle.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      )} */}
+      )}
 
       {plans
         .filter((p) => p.isActive)
@@ -533,16 +535,30 @@ function TabBuyPlan({
                     <span className="text-xl font-bold" style={{ color }}>
                       Free
                     </span>
-                  ) : (
-                    <div>
-                      <span className="text-xl font-bold" style={{ color }}>
-                        ৳{activeCycle ? Math.max(0, (plan.price * activeCycle.durationInMonths) - activeCycle.discountAmount) : plan.price}
-                      </span>
-                      <span className="text-xs text-ds-outline">
-                        /{activeCycle ? activeCycle.name.toLowerCase() : "mo"}
-                      </span>
-                    </div>
-                  )}
+                  ) : (() => {
+                    const months = activeCycle?.durationInMonths ?? 1;
+                    const discount = activeCycle?.discountAmount ?? 0;
+                    const original = plan.price * months;
+                    const final = Math.max(0, original - discount);
+                    const hasDiscount = discount > 0 && activeCycle;
+                    return (
+                      <div className="flex flex-col items-end leading-tight">
+                        {hasDiscount && (
+                          <span className="text-xs text-ds-outline line-through font-semibold">
+                            ৳{original}
+                          </span>
+                        )}
+                        <div>
+                          <span className="text-xl font-extrabold" style={{ color }}>
+                            ৳{final}
+                          </span>
+                          <span className="text-xs text-ds-outline ml-0.5">
+                            /{activeCycle ? activeCycle.name.toLowerCase() : "mo"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

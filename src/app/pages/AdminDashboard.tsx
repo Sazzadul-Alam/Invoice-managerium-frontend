@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { adminApi, billingCycleApi } from "../api/subscription.api";
 import { getToken, getRole, clearSession } from "../utils/session";
 import type { SubStats, PopulatedSubscription, ApiPlan, ApiBillingCycle } from "../types";
@@ -33,10 +33,19 @@ const headlineFont = { fontFamily: "'Manrope', sans-serif" } as const;
 const TABS = ["overview", "pending", "all", "plans", "profile"] as const;
 type Tab = (typeof TABS)[number];
 
+const PLAN_SUBTABS = ["pricing", "cycles"] as const;
+type PlanSubTab = (typeof PLAN_SUBTABS)[number];
+
 /* ══════════════════════════════════════════════════════════════════ */
 export function AdminDashboard() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("overview");
+  const { tab: urlTab, subTab: urlSubTab } = useParams<{ tab?: string; subTab?: string }>();
+  const tab: Tab = (TABS as readonly string[]).includes(urlTab ?? "")
+    ? (urlTab as Tab)
+    : "overview";
+  const setTab = (next: Tab) => {
+    navigate(next === "plans" ? "/admin/plans/pricing" : `/admin/${next}`);
+  };
   const [stats, setStats] = useState<SubStats | null>(null);
   const [subs, setSubs] = useState<PopulatedSubscription[]>([]);
   const [total, setTotal] = useState(0);
@@ -54,6 +63,13 @@ export function AdminDashboard() {
   useEffect(() => {
     if (!getToken() || getRole() !== "admin") navigate("/login", { replace: true });
   }, [navigate]);
+
+  // Redirect bare /admin → /admin/overview
+  useEffect(() => {
+    if (!urlTab) {
+      navigate("/admin/overview", { replace: true });
+    }
+  }, [urlTab, navigate]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -315,7 +331,8 @@ export function AdminDashboard() {
   );
 
   const PlansTab = () => {
-    const [subTab, setSubTab] = useState<"plans" | "cycles">("plans");
+    const subTab: PlanSubTab = urlSubTab === "cycles" ? "cycles" : "pricing";
+    const setSubTab = (next: PlanSubTab) => navigate(`/admin/plans/${next}`);
 
     const [plans, setPlans] = useState<ApiPlan[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(true);
@@ -353,7 +370,7 @@ export function AdminDashboard() {
     }, []);
 
     useEffect(() => {
-      if (subTab === "plans") loadPlans();
+      if (subTab === "pricing") loadPlans();
       else loadCycles();
     }, [loadPlans, loadCycles, subTab]);
 
@@ -411,7 +428,7 @@ export function AdminDashboard() {
         {/* Sub-tab switcher */}
         <div className="flex gap-2 mb-5 border-b border-ds-outline-variant">
           {([
-            { key: "plans", label: "Pricing Plans" },
+            { key: "pricing", label: "Pricing Plans" },
             { key: "cycles", label: "Billing Cycles" },
           ] as const).map(t => {
             const active = subTab === t.key;
@@ -430,7 +447,7 @@ export function AdminDashboard() {
           })}
         </div>
 
-        {subTab === "plans" && (
+        {subTab === "pricing" && (
           <div>
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-lg font-extrabold text-ds-on-surface" style={headlineFont}>Subscription Plans</h1>

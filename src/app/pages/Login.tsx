@@ -25,7 +25,7 @@ export function Login() {
       const data = await authApi.login({ email, password });
       saveSession(data.access_token, data.user);
       if (data.user.role === "admin") {
-        navigate("/admin/dashboard");
+        navigate("/admin/overview");
       } else {
         navigate("/dashboard");
       }
